@@ -32,14 +32,36 @@ class JOWWindow(QtWidgets.QDialog):
     def __init__(self, parent=maya_main_window()):
         super(JOWWindow, self).__init__(parent)
         self.setWindowTitle("JOW : Joint Orient Workbench by SDBM")
-        self.resize(600, 700)
+
+        self.resize(780, 900)
+        self.setMinimumSize(520, 520)
+        self.setSizeGripEnabled(True)
+    
         self._updating_axis_combos = False
 
         self.build_ui()
 
     def build_ui(self):
-        layout = QtWidgets.QVBoxLayout(self)
+        margins = 4
+        main_layout = QtWidgets.QVBoxLayout(self)
+        main_layout.setContentsMargins(margins, margins, margins,margins)
+
+        self.main_splitter = QtWidgets.QSplitter(QtCore.Qt.Vertical)
+
+        self.controls_widget = QtWidgets.QWidget()
+        layout = QtWidgets.QVBoxLayout(self.controls_widget)
+        layout.setContentsMargins(margins, margins, margins,margins)
+
+        self.viewport_widget = QtWidgets.QWidget()
+        viewport_layout = QtWidgets.QVBoxLayout(self.viewport_widget)
+        viewport_layout.setContentsMargins(margins, margins, margins,margins)
+        self.viewport_widget.setSizePolicy(
+            QtWidgets.QSizePolicy.Expanding,
+            QtWidgets.QSizePolicy.Expanding
+            )
+
         self.configuration_layout = QtWidgets.QHBoxLayout()
+
 
         ##########################################################
         # Primary
@@ -220,41 +242,56 @@ class JOWWindow(QtWidgets.QDialog):
         # Viewport
         ##########################################################
         self.viewport = JOW_viewport.JOWViewport()
-        layout.addWidget(self.viewport)
+        self.viewport.setSizePolicy(
+            QtWidgets.QSizePolicy.Expanding,
+            QtWidgets.QSizePolicy.Expanding
+        )
+
+        viewport_layout.addWidget(self.viewport, 1)
+
 
         self.viewport.joint_clicked.connect(self.select_joint_from_viewport)
         
         ##########################################################
-        # Preview
+        # Bottom Actions
         ##########################################################
-        preview_btn = QtWidgets.QPushButton("Rebuild Preview")
-        preview_btn.clicked.connect(self.refresh_preview)
-        layout.addWidget(preview_btn)
+        bottom_actions_layout = QtWidgets.QHBoxLayout()
+
+        rebuild_preview_btn = QtWidgets.QPushButton("Rebuild Preview")
+        rebuild_preview_btn.clicked.connect(self.refresh_preview)
+
+        debug_preview_btn = QtWidgets.QPushButton("Debug Preview Data")
+        debug_preview_btn.clicked.connect(self.debug_preview_data)
+
+        apply_btn = QtWidgets.QPushButton("Apply Orientation")
+        #apply_btn.setMinimumHeight(40)
+        apply_btn.clicked.connect(self.apply_orientation)
+
+        bottom_actions_layout.addWidget(rebuild_preview_btn)
+        bottom_actions_layout.addWidget(debug_preview_btn)
+        bottom_actions_layout.addWidget(apply_btn)
+
+        viewport_layout.addLayout(bottom_actions_layout)
 
         ##########################################################
         # Warnings
         ##########################################################
-        self.warning_label = QtWidgets.QLabel("")
+        self.warning_label = QtWidgets.QLabel("Logger: ")
         self.warning_label.setStyleSheet("color: #ffcc66;")
         self.warning_label.setWordWrap(True)
 
-        layout.addWidget(self.warning_label)
+        viewport_layout.addWidget(self.warning_label)
 
-        ##########################################################
-        # Preview Debug
-        ##########################################################
-        preview_btn = QtWidgets.QPushButton("Debug Preview Data")
-        preview_btn.clicked.connect(self.debug_preview_data)
-        layout.addWidget(preview_btn)
 
-        ##########################################################
-        # Apply
-        ##########################################################
-        apply_btn = QtWidgets.QPushButton("Apply Orientation")
-        apply_btn.setMinimumHeight(40)
-        apply_btn.clicked.connect(self.apply_orientation)
+        self.main_splitter.addWidget(self.controls_widget)
+        self.main_splitter.addWidget(self.viewport_widget)
 
-        layout.addWidget(apply_btn)
+        self.main_splitter.setStretchFactor(0, 0)
+        self.main_splitter.setStretchFactor(1, 1)
+
+        self.main_splitter.setSizes([360, 520])
+
+        main_layout.addWidget(self.main_splitter)
 
         self.update_axis_combo_options()
         self.update_cache_labels()

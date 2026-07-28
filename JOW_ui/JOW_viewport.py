@@ -19,6 +19,11 @@ class JOWViewport(QtWidgets.QFrame):
         super(JOWViewport, self).__init__(parent)
         self.zoom = 1.0
         self.pan = QtCore.QPointF(0, 0)
+
+        self.view_center_a = 0.0
+        self.view_center_b = 0.0
+        self.view_scale = 40.0
+
         self.last_mouse_pos = None
         self.mouse_press_pos = None
         self.projection_mode = "XY"
@@ -67,7 +72,12 @@ class JOWViewport(QtWidgets.QFrame):
         self.secondary_mode = mode
         self.update()
     def set_preview_chains(self, preview_chains):
+        had_chains = bool(self.preview_chains)
         self.preview_chains = preview_chains
+        if preview_chains and not had_chains:
+            self.frame_preview()
+            return
+
         self.update()
     def set_show_joint_names(self, state):
         self.show_joint_names = state
@@ -100,8 +110,12 @@ class JOWViewport(QtWidgets.QFrame):
 
         rect = self.rect()
 
+        self.draw_grid(painter, rect)
+
         if not self.preview_chains:
             self.draw_empty_state(painter, rect)
+            self.draw_axis_gizmo(painter, rect)
+            self.draw_overlay(painter, rect)
             painter.end()
             return
 
@@ -109,13 +123,13 @@ class JOWViewport(QtWidgets.QFrame):
 
         if not points:
             self.draw_empty_state(painter, rect)
+            self.draw_axis_gizmo(painter, rect)
+            self.draw_overlay(painter, rect)
             painter.end()
             return
 
         bounds = self.get_bounds(points)
         scale = self.get_scale(bounds, rect)
-
-        self.draw_grid(painter, rect)
 
         for chain in self.preview_chains:
             self.draw_chain(painter, chain, bounds, scale, rect)
@@ -159,6 +173,7 @@ class JOWViewport(QtWidgets.QFrame):
             "min_b": min_b,
             "max_b": max_b
         }
+    """
     def get_scale(self, bounds, rect):
         width = max(bounds["max_a"] - bounds["min_a"], 0.001)
         height = max(bounds["max_b"] - bounds["min_b"], 0.001)
@@ -167,46 +182,163 @@ class JOWViewport(QtWidgets.QFrame):
         scale_y = (rect.height() * 0.75) / height
 
         return min(scale_x, scale_y) * self.zoom
+    """
+    def get_scale(self, bounds, rect):
+        return self.view_scale * self.zoom
 
     def project_point(self, point, bounds, scale, rect):
         a, b = self.get_projected_values(point)
 
-        center_a = (bounds["min_a"] + bounds["max_a"]) * 0.5
-        center_b = (bounds["min_b"] + bounds["max_b"]) * 0.5
-
-        x = rect.center().x() + ((a - center_a) * scale) + self.pan.x()
-        y = rect.center().y() - ((b - center_b) * scale) + self.pan.y()
+        x = rect.center().x() + ((a - self.view_center_a) * scale) + self.pan.x()
+        y = rect.center().y() - ((b - self.view_center_b) * scale) + self.pan.y()
 
         return QtCore.QPointF(x, y)
 
+    def project_values(self, a, b, rect, scale):
+        x = rect.center().x() + ((a - self.view_center_a) * scale) + self.pan.x()
+        y = rect.center().y() - ((b - self.view_center_b) * scale) + self.pan.y()
+
+        return QtCore.QPointF(x, y)
+
+    def screen_to_projected_values(self, x, y, rect, scale):
+        a = self.view_center_a + ((x - rect.center().x() - self.pan.x()) / scale)
+        b = self.view_center_b - ((y - rect.center().y() - self.pan.y()) / scale)
+
+        return a, b
+
+    def get_visible_projected_range(self, rect, scale):
+        a_min, b_max = self.screen_to_projected_values(0, 0, rect, scale)
+        a_max, b_min = self.screen_to_projected_values(rect.width(), rect.height(), rect, scale)
+
+        return a_min, a_max, b_min, b_max
+
+    def get_grid_size(self, scale):
+        if scale <= 0:
+            return 1.0
+
+        target_pixels = 45.0
+        target_world_size = target_pixels / scale
+
+        if target_world_size <= 0:
+            return 1.0
+
+        magnitude = 10 ** py_math.floor(py_math.log10(target_world_size))
+
+        for multiplier in [1, 2, 5, 10]:
+            grid_size = magnitude * multiplier
+
+            if grid_size >= target_world_size:
+                return grid_size
+
+        return magnitude * 10
 
     def draw_grid(self, painter, rect):
         if not self.show_grid:
             return
 
-        spacing = 40
+        scale = self.get_scale(None, rect)
+
+        if scale <= 0:
+            return
+
+        grid_size = self.get_grid_size(scale)
+
+        center_u, center_v = self.get_grid_center_uv()
+
+        visible_world_size = max(
+            rect.width(),
+            rect.height()
+        ) / scale
+
+        extent = max(
+            visible_world_size * 1.5,
+            grid_size * 20
+        )
+
+        min_u = center_u - extent
+        max_u = center_u + extent
+
+        min_v = center_v - extent
+        max_v = center_v + extent
+
+        start_u = py_math.floor(min_u / grid_size) * grid_size
+        start_v = py_math.floor(min_v / grid_size) * grid_size
 
         painter.setPen(QtGui.QPen(QtGui.QColor(45, 45, 45), 1))
 
-        start_x = int(self.pan.x()) % spacing
-        start_y = int(self.pan.y()) % spacing
+        u = start_u
 
-        x = start_x
+        while u <= max_u:
+            point_a = self.project_grid_point(u, min_v, rect, scale)
+            point_b = self.project_grid_point(u, max_v, rect, scale)
 
-        while x < rect.width():
-            painter.drawLine(x, 0, x, rect.height())
-            x += spacing
+            painter.drawLine(point_a, point_b)
 
-        y = start_y
+            u += grid_size
 
-        while y < rect.height():
-            painter.drawLine(0, y, rect.width(), y)
-            y += spacing
+        v = start_v
 
-        painter.setPen(QtGui.QPen(QtGui.QColor(70, 70, 70), 1))
+        while v <= max_v:
+            point_a = self.project_grid_point(min_u, v, rect, scale)
+            point_b = self.project_grid_point(max_u, v, rect, scale)
 
-        painter.drawLine(rect.center().x() + self.pan.x(), 0, rect.center().x() + self.pan.x(), rect.height())
-        painter.drawLine(0, rect.center().y() + self.pan.y(), rect.width(), rect.center().y() + self.pan.y())
+            painter.drawLine(point_a, point_b)
+
+            v += grid_size
+
+        self.draw_grid_origin_axes(
+            painter,
+            rect,
+            scale,
+            min_u,
+            max_u,
+            min_v,
+            max_v
+        )
+
+    def draw_grid_origin_axes(
+        self,
+        painter,
+        rect,
+        scale,
+        min_u,
+        max_u,
+        min_v,
+        max_v
+    ):
+        grid_plane = self.get_grid_plane()
+
+        if grid_plane == "XY":
+            horizontal_color = QtGui.QColor(255, 80, 80)
+            vertical_color = QtGui.QColor(80, 255, 80)
+
+        elif grid_plane == "XZ":
+            horizontal_color = QtGui.QColor(255, 80, 80)
+            vertical_color = QtGui.QColor(80, 140, 255)
+
+        elif grid_plane == "ZY":
+            horizontal_color = QtGui.QColor(80, 140, 255)
+            vertical_color = QtGui.QColor(80, 255, 80)
+
+        else:
+            horizontal_color = QtGui.QColor(255, 80, 80)
+            vertical_color = QtGui.QColor(80, 140, 255)
+        lineWidth = 1
+        if min_v <= 0 <= max_v:
+            painter.setPen(QtGui.QPen(horizontal_color, lineWidth))
+
+            point_a = self.project_grid_point(min_u, 0, rect, scale)
+            point_b = self.project_grid_point(max_u, 0, rect, scale)
+
+            painter.drawLine(point_a, point_b)
+
+        if min_u <= 0 <= max_u:
+            painter.setPen(QtGui.QPen(vertical_color, lineWidth))
+
+            point_a = self.project_grid_point(0, min_v, rect, scale)
+            point_b = self.project_grid_point(0, max_v, rect, scale)
+
+            painter.drawLine(point_a, point_b)
 
     def draw_axis_gizmo(self, painter, rect):
         if not self.show_axis_gizmo:
@@ -366,10 +498,14 @@ class JOWViewport(QtWidgets.QFrame):
     def draw_overlay(self, painter, rect):
         painter.setPen(QtGui.QColor(200, 200, 200))
 
-        text = "Projection: {}   Mode: {}   Chains: {}".format(
+        scale = self.get_scale(None, rect)
+        grid_size = self.get_grid_size(scale)
+
+        text = "Projection: {}   Mode: {}   Chains: {}   Grid: {}".format(
             self.projection_mode,
             self.secondary_mode,
-            len(self.preview_chains)
+            len(self.preview_chains),
+            round(grid_size, 3)
         )
 
         painter.drawText(
@@ -501,6 +637,79 @@ class JOWViewport(QtWidgets.QFrame):
         x, y, z = self.rotate_vector(point)
         return x, y
 
+    def get_grid_plane(self):
+        if self.projection_mode == "XY":
+            return "XY"
+
+        if self.projection_mode == "XZ":
+            return "XZ"
+
+        if self.projection_mode == "ZY":
+            return "ZY"
+
+        if self.projection_mode == "Orbit":
+            return "XZ"
+
+        return "XZ"
+
+
+    def make_grid_point(self, u, v):
+        grid_plane = self.get_grid_plane()
+
+        if grid_plane == "XY":
+            return self.vector_from_components(u, v, 0)
+
+        if grid_plane == "XZ":
+            return self.vector_from_components(u, 0, v)
+
+        if grid_plane == "ZY":
+            return self.vector_from_components(0, v, u)
+
+        return self.vector_from_components(u, 0, v)
+
+
+    def get_grid_center_uv(self):
+        points = self.collect_points()
+
+        if not points:
+            return 0.0, 0.0
+
+        grid_plane = self.get_grid_plane()
+
+        if grid_plane == "XY":
+            values = [(p.x, p.y) for p in points]
+
+        elif grid_plane == "XZ":
+            values = [(p.x, p.z) for p in points]
+
+        elif grid_plane == "ZY":
+            values = [(p.z, p.y) for p in points]
+
+        else:
+            values = [(p.x, p.z) for p in points]
+
+        min_u = min(v[0] for v in values)
+        max_u = max(v[0] for v in values)
+
+        min_v = min(v[1] for v in values)
+        max_v = max(v[1] for v in values)
+
+        center_u = (min_u + max_u) * 0.5
+        center_v = (min_v + max_v) * 0.5
+
+        return center_u, center_v
+
+
+    def project_grid_point(self, u, v, rect, scale):
+        point = self.make_grid_point(u, v)
+
+        return self.project_point(
+            point,
+            None,
+            scale,
+            rect
+        )
+
     def get_projected_values(self, point):
         if self.projection_mode == "XY":
             return point.x, point.y
@@ -541,10 +750,29 @@ class JOWViewport(QtWidgets.QFrame):
         return axis_a, axis_b
 
     def frame_preview(self):
+        points = self.collect_points()
+
+        if not points:
+            return
+
+        rect = self.rect()
+        bounds = self.get_bounds(points)
+
+        width = max(bounds["max_a"] - bounds["min_a"], 0.001)
+        height = max(bounds["max_b"] - bounds["min_b"], 0.001)
+
+        self.view_center_a = (bounds["min_a"] + bounds["max_a"]) * 0.5
+        self.view_center_b = (bounds["min_b"] + bounds["max_b"]) * 0.5
+
+        scale_x = (rect.width() * 0.75) / width
+        scale_y = (rect.height() * 0.75) / height
+
+        self.view_scale = min(scale_x, scale_y)
+
         self.zoom = 1.0
         self.pan = QtCore.QPointF(0, 0)
-        self.update()
 
+        self.update()
 
     def frame_selected_joint(self):
         if not self.selected_joint:
@@ -552,7 +780,7 @@ class JOWViewport(QtWidgets.QFrame):
 
         bounds, scale, rect = self.get_current_view_data()
 
-        if not bounds:
+        if not rect:
             return
 
         for chain in self.preview_chains:
@@ -560,12 +788,12 @@ class JOWViewport(QtWidgets.QFrame):
                 if joint.name != self.selected_joint:
                     continue
 
-                point = self.project_point(joint.position, bounds, scale, rect)
+                a, b = self.get_projected_values(joint.position)
 
-                self.pan += QtCore.QPointF(
-                    rect.center().x() - point.x(),
-                    rect.center().y() - point.y()
-                )
+                self.view_center_a = a
+                self.view_center_b = b
+
+                self.pan = QtCore.QPointF(0, 0)
 
                 self.update()
                 return
@@ -583,8 +811,13 @@ class JOWViewport(QtWidgets.QFrame):
     def reset_view(self):
         self.zoom = 1.0
         self.pan = QtCore.QPointF(0, 0)
+
+        self.view_center_a = 0.0
+        self.view_center_b = 0.0
+
         self.orbit_yaw = 0.0
         self.orbit_pitch = 0.0
+
         self.update()
 
     def get_current_view_data(self):
