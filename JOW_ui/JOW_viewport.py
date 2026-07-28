@@ -44,6 +44,7 @@ class JOWViewport(QtWidgets.QFrame):
         self.orbit_sensitivity = 0.01
 
         self.setMouseTracking(True)
+        self.setFocusPolicy(QtCore.Qt.StrongFocus)
 
         self.preview_chains = []
 

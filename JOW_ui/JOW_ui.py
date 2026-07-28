@@ -5,9 +5,11 @@ from maya import OpenMayaUI
 try:
     from shiboken2 import wrapInstance
     from PySide2 import QtWidgets
+    from PySide2 import QtCore
 except ImportError:
     from shiboken6 import wrapInstance
     from PySide6 import QtWidgets
+    from PySide6 import QtCore
 
 from JOW_core import JOW_core
 from JOW_ui import JOW_viewport
@@ -45,6 +47,7 @@ class JOWWindow(QtWidgets.QDialog):
         self.configuration_layout.addWidget(QtWidgets.QLabel("Primary Axis"))
         self.primary_combo = QtWidgets.QComboBox()
         self.primary_combo.addItems(["X", "Y", "Z"])
+        self.disable_combo_keyboard_focus(self.primary_combo)
         self.configuration_layout.addWidget(self.primary_combo)
 
         ##########################################################
@@ -53,6 +56,7 @@ class JOWWindow(QtWidgets.QDialog):
         self.configuration_layout.addWidget(QtWidgets.QLabel("Secondary Axis"))
         self.secondary_combo = QtWidgets.QComboBox()
         self.secondary_combo.addItems(["X", "Y", "Z"])
+        self.disable_combo_keyboard_focus(self.secondary_combo)
         self.secondary_combo.setCurrentText("Y")
 
         self.configuration_layout.addWidget(self.secondary_combo)
@@ -68,6 +72,7 @@ class JOWWindow(QtWidgets.QDialog):
             "Curve Plane",
             "Custom Object"
         ])
+        self.disable_combo_keyboard_focus(self.mode_combo)
 
         self.configuration_layout.addWidget(self.mode_combo)
         layout.addLayout(self.configuration_layout)
@@ -75,9 +80,26 @@ class JOWWindow(QtWidgets.QDialog):
         ##########################################################
         # Guide
         ##########################################################
-        guide_btn = QtWidgets.QPushButton("Create Guide Locator")
-        guide_btn.clicked.connect(self.create_guide)
-        layout.addWidget(guide_btn)
+        guide_layout = QtWidgets.QHBoxLayout()
+
+        create_guide_btn = QtWidgets.QPushButton("Create Guide Locator")
+        create_guide_btn.clicked.connect(self.create_guide)
+
+        select_guide_btn = QtWidgets.QPushButton("Select Guide")
+        select_guide_btn.clicked.connect(self.select_guide)
+
+        delete_guide_btn = QtWidgets.QPushButton("Delete Guide")
+        delete_guide_btn.clicked.connect(self.delete_guide)
+
+        pick_custom_object_btn = QtWidgets.QPushButton("Pick Custom Object")
+        pick_custom_object_btn.clicked.connect(self.pick_custom_object)
+
+        guide_layout.addWidget(create_guide_btn)
+        guide_layout.addWidget(select_guide_btn)
+        guide_layout.addWidget(delete_guide_btn)
+        guide_layout.addWidget(pick_custom_object_btn)
+
+        layout.addLayout(guide_layout)
 
         ##########################################################
         # Cache
@@ -125,6 +147,7 @@ class JOWWindow(QtWidgets.QDialog):
         viewport_controls_layout.addWidget(QtWidgets.QLabel("Projection"))
         self.projection_combo = QtWidgets.QComboBox()
         self.projection_combo.addItems(["XY", "XZ", "ZY", "Orbit"])
+        self.disable_combo_keyboard_focus(self.projection_combo)
         self.projection_combo.currentTextChanged.connect(self.change_projection)
         viewport_controls_layout.addWidget(self.projection_combo)
 
@@ -252,6 +275,12 @@ class JOWWindow(QtWidgets.QDialog):
             settings.roots = JOW_preview.get_preview_roots()
 
         return settings
+    
+    def disable_combo_keyboard_focus(self, combo):
+        combo.setFocusPolicy(QtCore.Qt.NoFocus)
+
+    def focus_viewport(self):
+        self.viewport.setFocus()
 
     ##########################################################
     # Cache methods
@@ -432,7 +461,7 @@ class JOWWindow(QtWidgets.QDialog):
             self._updating_axis_combos = False
 
         self.refresh_preview()
-
+        self.focus_viewport()
 
     def on_secondary_axis_changed(self, value):
         if self._updating_axis_combos:
@@ -460,6 +489,7 @@ class JOWWindow(QtWidgets.QDialog):
             self._updating_axis_combos = False
 
         self.refresh_preview()
+        self.focus_viewport()
 
     def set_warning(self, message):
         self.warning_label.setText(message)
@@ -487,12 +517,63 @@ class JOWWindow(QtWidgets.QDialog):
         self.joint_size_spinbox.valueChanged.connect(self.update_viewport_sizes)
         self.normal_length_spinbox.valueChanged.connect(self.update_viewport_sizes)
 
+    ##########################################################
+    # Secondary Axis Guide Manager
+    ##########################################################
+
     def create_guide(self):
-        JOW_guides.create_guide()
+        guide = JOW_guides.create_guide()
+
+        if guide:
+            cmds.select(guide, r=True)
+            JOW_preview.update_cached_custom_object_from_selection()
+
+        self.update_cache_labels()
         self.refresh_preview()
+
+
+    def select_guide(self):
+        guide = JOW_guides.select_guide()
+
+        if guide:
+            JOW_preview.update_cached_custom_object_from_selection()
+            self.set_warning("Guide selected: {}".format(guide.split("|")[-1]))
+
+        self.update_cache_labels()
+        self.refresh_preview()
+
+
+    def delete_guide(self):
+        JOW_guides.delete_guide()
+
+        self.set_warning("Guide deleted.")
+        self.update_cache_labels()
+        self.refresh_preview()
+
+
+    def pick_custom_object(self):
+        custom_object = JOW_guides.get_selected_custom_object()
+
+        if not custom_object:
+            self.set_warning("Select a non-joint object to use as Custom Object guide.")
+            return
+
+        JOW_preview.update_cached_custom_object_from_selection()
+
+        self.set_warning(
+            "Custom Object picked: {}".format(
+                custom_object.split("|")[-1]
+            )
+        )
+
+        self.update_cache_labels()
+        self.refresh_preview()
+
+
 
     def change_projection(self):
         self.viewport.set_projection_mode(self.projection_combo.currentText())
+        self.focus_viewport()
 
     def reset_view(self):
         self.viewport.reset_view()
@@ -503,6 +584,9 @@ class JOWWindow(QtWidgets.QDialog):
         settings = self.get_settings()
 
         preview_chains = JOW_preview.build_preview_chains(settings)
+        if settings.secondary_mode == "Custom Object" and not settings.custom_object:
+            self.set_warning("Custom Object mode needs a valid non-joint guide object.")
+        
         self.viewport.set_secondary_mode(settings.secondary_mode)
         self.viewport.set_show_joint_names(self.show_joint_names_checkbox.isChecked())
         self.viewport.set_preview_chains(preview_chains)
@@ -514,10 +598,13 @@ class JOWWindow(QtWidgets.QDialog):
         self.update_cache_labels()
         if not preview_chains:
             self.set_warning("No valid cached or selected joint chains found.")
+        elif settings.secondary_mode == "Custom Object" and not settings.custom_object:
+            self.set_warning("Custom Object mode needs a valid non-joint guide object.")
         else:
             self.clear_warning()
 
         print("JOW preview refreshed:", len(preview_chains), "chain(s)")
+        self.focus_viewport()
 
     def debug_preview_data(self):
         settings = self.get_settings()

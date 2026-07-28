@@ -1,83 +1,69 @@
 ##########################################################
-# 01. JOW Foundation
+# 01. Foundation / Architecture
 ##########################################################
 [✓] 01.01 Bootstrap system
 [✓] 01.02 Hardcoded module reload list
 [✓] 01.03 Launcher system
-[✓] 01.04 Bootstrap only bootstraps
-[✓] 01.05 Launcher owns window creation
-[✓] 01.06 Modular package structure
-[✓] 01.07 Main UI
-[✓] 01.08 Horizontal configuration layout
-[✓] 01.09 Primary Axis selection
-[✓] 01.10 Secondary Axis selection
-[✓] 01.11 Secondary Axis cannot match Primary Axis
-[✓] 01.12 Primary Axis rules over Secondary Axis
-[✓] 01.13 Secondary Mode selection
-[✓] 01.14 Apply Orientation button
-[✓] 01.15 Joint orientation working
-[✓] 01.16 Root chain processing
-[✓] 01.17 Cached preview root selection
-[✓] 01.18 End joint orientation/preview support
-[✓] 01.19 World mode
-[✓] 01.20 Previous mode
-[✓] 01.21 Curve Plane mode
-[✓] 01.22 Custom Object mode
+[✓] 01.04 Modular package structure
+[✓] 01.05 Main UI
+[✓] 01.06 Orientation backend migrated
+[✓] 01.07 Math split into JOW_math.py
+[✓] 01.08 Data classes started in JOW_data.py
+[✓] 01.09 Preview system started in JOW_preview.py
+[✓] 01.10 Viewport system started in JOW_viewport.py
 
 ##########################################################
-# 02. Undo / Safety
+# 02. Orientation Core
 ##########################################################
-[✓] 02.01 Add undo_chunk decorator system
-[✓] 02.02 Create JOW_core/JOW_utils/JOW_undo.py
-[✓] 02.03 Decorate orientation actions with undo_chunk
-[✓] 02.04 Decorate guide creation with undo_chunk
-[✓] 02.05 Add nested-safe undo depth system
-[ ] 02.06 Add operation failure cleanup checks
-[ ] 02.07 Add temporary node cleanup validator
-[ ] 02.08 Add safe temp node naming system
-[ ] 02.09 Add emergency cleanup function
-[✓] 02.10 Add warning when no valid joints are found
+[✓] 02.01 Primary / Secondary Axis selection
+[✓] 02.02 Secondary Axis cannot match Primary Axis
+[✓] 02.03 Primary Axis rules over Secondary Axis
+[✓] 02.04 Secondary Mode selection
+[✓] 02.05 World mode
+[✓] 02.06 Previous mode
+[✓] 02.07 Curve Plane mode
+[✓] 02.08 Custom Object mode
+[✓] 02.09 Root chain processing
+[✓] 02.10 End joint orientation/preview support
+[✓] 02.11 Separate orientation compute from application
+[✓] 02.12 JointOrientation dataclass result system
+[✓] 02.13 Chain length and zero-length guards
+[✓] 02.14 Apply optionally uses cached roots
+[ ] 02.15 Add optional orient-end-joint setting
+[ ] 02.16 Add branch-chain handling strategy
+[ ] 02.17 Add multi-root orientation summary
+[ ] 02.18 Add negative primary/secondary axes later
 
 ##########################################################
-# 03. Settings / Data
+# 03. Undo / Safety
 ##########################################################
-[✓] 03.01 Create OrientationSettings class
-[✓] 03.02 UI creates OrientationSettings
-[✓] 03.03 Feed OrientationSettings through orientation pipeline
-[✓] 03.04 Add flip_plane setting
-[✓] 03.05 Add average_normals setting
-[✓] 03.06 Add cached roots to settings
-[ ] 03.07 Move settings gathering fully out of UI
-[ ] 03.08 Add settings serialization
-[ ] 03.09 Add settings validation helper
-[ ] 03.10 Add default settings factory
-[ ] 03.11 Add reset-to-defaults button
-[ ] 03.12 Add settings copy/paste
-[ ] 03.13 Add settings debug print/dump
-[ ] 03.14 Add versioned settings data
+[✓] 03.01 undo_chunk decorator system
+[✓] 03.02 Nested-safe undo depth system
+[✓] 03.03 Decorate orientation actions with undo_chunk
+[✓] 03.04 Decorate guide creation with undo_chunk
+[✓] 03.05 Warning when no valid joints are found
+[ ] 03.06 Operation failure cleanup checks
+[ ] 03.07 Temporary node cleanup validator
+[ ] 03.08 Safe temp node naming system
+[ ] 03.09 Emergency cleanup function
 
 ##########################################################
-# 04. Core / Math Architecture
+# 04. Settings / Data
 ##########################################################
-[✓] 04.01 Orientation backend migrated
-[✓] 04.02 JOW_math.py contains orientation math
-[✓] 04.03 Split math helpers into JOW_math.py
-[✓] 04.04 Separate orientation compute from application
-[✓] 04.05 Create compute_chain_orientation()
-[✓] 04.06 Create apply_chain_orientation()
-[✓] 04.07 Rebuild orient_chain() around compute/apply split
-[✓] 04.08 Rename/rework secondary mode flow through settings
-[✓] 04.09 Add flip plane support in math
-[✓] 04.10 Add average normals toggle support in math
-[✓] 04.11 Make Apply optionally use cached roots
-[✓] 04.12 Replace orientation result dictionaries with JointOrientation dataclass
-[✓] 04.13 Add chain length guard
-[✓] 04.14 Add zero-length forward guard
-[ ] 04.15 Add optional orient-end-joint setting
-[ ] 04.16 Add optional preserve-end-joint-orientation setting
-[ ] 04.17 Add branch-chain handling strategy
-[ ] 04.18 Add multi-root orientation summary
-[ ] 04.19 Add support for negative primary/secondary axes later
+[✓] 04.01 OrientationSettings class
+[✓] 04.02 UI creates OrientationSettings
+[✓] 04.03 OrientationSettings feeds orientation pipeline
+[✓] 04.04 flip_plane setting
+[✓] 04.05 average_normals setting
+[✓] 04.06 cached roots setting
+[✓] 04.07 JointOrientation dataclass
+[ ] 04.08 Move settings gathering fully out of UI
+[ ] 04.09 Settings serialization
+[ ] 04.10 Settings validation helper
+[ ] 04.11 Default settings factory
+[ ] 04.12 Reset-to-defaults button
+[ ] 04.13 Settings copy/paste
+[ ] 04.14 Versioned settings data
 
 ##########################################################
 # 05. Selection / Cache System
@@ -86,276 +72,291 @@
 [✓] 05.02 Reuse cached roots when selection has no joints
 [✓] 05.03 Allow custom object selection without losing chain preview
 [✓] 05.04 Cache custom object for preview
-[✓] 05.05 Add visible cached-chain log in UI
-[✓] 05.06 Add current guide object label
-[✓] 05.07 Add Clear Cache button
-[✓] 05.08 Add Set Cache From Selection / Refresh From Selection button
-[✓] 05.09 Add Apply To Cached Chain toggle
-[✓] 05.10 Add Lock Chain toggle
-[✓] 05.11 Add warning if cached roots no longer exist
-[ ] 05.12 Add cached root row selection
-[ ] 05.13 Add remove single cached root button
-[ ] 05.14 Add double-click cached root to select it in Maya
-[ ] 05.15 Add lock-selection visual state in viewport
+[✓] 05.05 Cached-chain log UI
+[✓] 05.06 Current guide object label
+[✓] 05.07 Clear Cache button
+[✓] 05.08 Set Cache From Selection button
+[✓] 05.09 Apply To Cached Chain toggle
+[✓] 05.10 Lock Cached Chain toggle
+[✓] 05.11 Cached root existence validation
+[✓] 05.12 Warning when cached roots were removed
+[ ] 05.13 Cached root row selection
+[ ] 05.14 Remove single cached root button
+[ ] 05.15 Double-click cached root to select it in Maya
+[ ] 05.16 Lock-selection visual state in viewport
 
 ##########################################################
-# 06. Presets
+# 06. Preview Data
 ##########################################################
-[ ] 06.01 Finish JOW_core/JOW_presets.py
-[ ] 06.02 Remove duplicated root-level JOW_presets.py
-[ ] 06.03 Create Save Preset button
-[ ] 06.04 Create Load Preset button
-[ ] 06.05 Create Delete Preset button
-[ ] 06.06 Add preset dropdown
-[ ] 06.07 Create built-in preset system
-[ ] 06.08 Add preset overwrite confirmation
-[ ] 06.09 Add preset folder creation validation
-[ ] 06.10 Add preset version field
-[ ] 06.11 Add import preset
-[ ] 06.12 Add export preset
-[ ] 06.13 Add preset notes/description field
+[✓] 06.01 PreviewChain data structure
+[✓] 06.02 PreviewJoint data structure
+[✓] 06.03 PreviewNormal data structure
+[✓] 06.04 PreviewGuide data structure
+[✓] 06.05 Orientation preview data
+[✓] 06.06 Curve plane preview data
+[✓] 06.07 Custom object preview data
+[✓] 06.08 Previous-mode normal preview data
+[✓] 06.09 Preview built from compute_chain_orientation()
+[ ] 06.10 PreviewPlane data structure
+[ ] 06.11 PreviewDiagnostic data structure
+[ ] 06.12 PreviewWarning data structure
+[ ] 06.13 Current-orientation preview data
+[ ] 06.14 Before/after preview pairing
 
 ##########################################################
-# 07. Preview Data
+# 07. Viewport
 ##########################################################
-[✓] 07.01 Build PreviewChain data structure
-[✓] 07.02 Build PreviewJoint data structure
-[✓] 07.03 Generate orientation preview data
-[✓] 07.04 Move basic preview generation into JOW_preview.py
-[✓] 07.05 Build preview from compute_chain_orientation()
-[✓] 07.06 Debug preview data button/test worked
-[✓] 07.07 Cached preview roots
-[✓] 07.08 Generate curve plane preview data
-[✓] 07.09 Generate custom object preview data
-[✓] 07.10 Generate previous-mode normal preview data
-[✓] 07.11 Add PreviewNormal data structure
-[✓] 07.12 Add PreviewGuide data structure
-[ ] 07.13 Add PreviewPlane data structure
-[ ] 07.14 Add PreviewDiagnostic data structure
-[ ] 07.15 Add PreviewWarning data structure
-[ ] 07.16 Add current-orientation preview data
-[ ] 07.17 Add before/after preview pairing
+[✓] 07.01 Basic viewport widget
+[✓] 07.02 Draw joints, bones and local XYZ axes
+[✓] 07.03 Draw curve plane normal
+[✓] 07.04 Draw custom object direction lines
+[✓] 07.05 Draw custom object marker
+[✓] 07.06 Draw previous-mode normals
+[✓] 07.07 Joint names toggle
+[✓] 07.08 Viewport joint picking
+[✓] 07.09 Select Maya joint from JOW viewport
+[✓] 07.10 Highlight selected joint
+[✓] 07.11 Zoom / pan / reset view
+[✓] 07.12 Projection modes: XY / XZ / ZY / Orbit
+[✓] 07.13 Fake orbit mode
+[✓] 07.14 Viewport grid
+[✓] 07.15 Mini axis gizmo
+[✓] 07.16 Mini axis gizmo Z flip fixed in ZY projection
+[✓] 07.17 Axis labels for selected joint
+[✓] 07.18 Axis / joint / normal size controls
+[✓] 07.19 Frame Preview button
+[✓] 07.20 Frame Selected button
+[ ] 07.21 Bone thickness setting
+[ ] 07.22 Viewport background color setting
+[ ] 07.23 Viewport color settings
+[ ] 07.24 True 3D viewport later
+[ ] 07.25 Proper orbit camera later
 
 ##########################################################
-# 08. Viewport
+# 08. Live Updates
 ##########################################################
-[✓] 08.01 Add viewport overlay text
-[✓] 08.02 Replace smiley placeholder widget
-[✓] 08.03 Build basic viewport widget
-[✓] 08.04 Draw joint positions
-[✓] 08.05 Draw bone connections
-[✓] 08.06 Draw local X axis
-[✓] 08.07 Draw local Y axis
-[✓] 08.08 Draw local Z axis
-[✓] 08.09 Add zoom
-[✓] 08.10 Add pan
-[✓] 08.11 Add reset view button
-[✓] 08.12 Add projection dropdown
-[✓] 08.13 Add XY projection
-[✓] 08.14 Add XZ projection
-[✓] 08.15 Add side projection
-[✓] 08.16 Fix projection axis flips
-[✓] 08.17 Add fake orbit mode
-[✓] 08.18 Add left mouse orbit rotation
-[✓] 08.19 Draw custom object direction lines
-[✓] 08.20 Draw custom object marker in viewport
-[✓] 08.21 Draw previous-mode normals
-[✓] 08.22 Add joint names toggle
-[✓] 08.23 Add viewport joint picking
-[✓] 08.24 Select Maya joint from JOW viewport
-[✓] 08.25 Highlight selected joint in JOW viewport
-[ ] 08.26 Draw viewport grid
-[ ] 08.27 Draw mini axis gizmo
-[ ] 08.28 Add axis labels X/Y/Z
-[ ] 08.29 Add viewport color settings
-[ ] 08.30 Add axis length setting
-[ ] 08.31 Add bone thickness setting
-[ ] 08.32 Add joint size setting
-[ ] 08.33 Add normal length setting
-[ ] 08.34 Add viewport background color setting
-[ ] 08.35 Add frame preview button
-[ ] 08.36 Add frame selected chain button
-[ ] 08.37 Add true 3D viewport later
-[ ] 08.38 Add proper orbit camera later
+[✓] 08.01 Auto-refresh for axis/mode changes
+[✓] 08.02 Auto-refresh for projection changes
+[✓] 08.03 Auto-refresh after guide creation
+[✓] 08.04 Auto-refresh after Apply Orientation
+[✓] 08.05 Auto-refresh for flip plane / average normals
+[✓] 08.06 Auto-refresh for viewport display settings
+[✓] 08.07 Preview survives non-joint object selection
+[✓] 08.08 Combo keyboard/type-to-select disabled
+[ ] 08.09 Auto-refresh when Maya selection changes
+[ ] 08.10 Auto-refresh when guide moves
+[ ] 08.11 Silent refresh mode when nothing is selected
+[ ] 08.12 Refresh throttling/debounce
+[ ] 08.13 Live preview toggle
+[ ] 08.14 Pause preview updates toggle
 
 ##########################################################
-# 09. Live Updates
+# 09. Curve Plane / Secondary Mode Visualization
 ##########################################################
-[✓] 09.01 Auto-refresh when primary axis changes
-[✓] 09.02 Auto-refresh when secondary axis changes
-[✓] 09.03 Auto-refresh when mode changes
-[✓] 09.04 Auto-refresh when projection changes
-[✓] 09.05 Auto-refresh after guide creation
-[✓] 09.06 Auto-refresh after Apply Orientation
-[✓] 09.07 Auto-refresh when flip plane changes
-[✓] 09.08 Auto-refresh when average normals changes
-[✓] 09.09 Auto-refresh when joint names toggle changes
-[✓] 09.10 Preview does not lose chain when selecting non-joint objects
-[ ] 09.11 Auto-refresh when Maya selection changes
-[ ] 09.12 Auto-refresh when guide moves
-[ ] 09.13 Add silent refresh mode when nothing is selected
-[ ] 09.14 Add refresh throttling/debounce
-[ ] 09.15 Add live preview toggle
-[ ] 09.16 Add pause preview updates toggle
+[✓] 09.01 Draw curve plane normal
+[✓] 09.02 Plane flip toggle
+[✓] 09.03 Average plane normals toggle
+[✓] 09.04 Draw previous-mode normals
+[✓] 09.05 Draw custom-object guide direction
+[ ] 09.06 Draw average curve plane
+[ ] 09.07 Plane visibility toggle
+[ ] 09.08 Curve plane stability warning
+[ ] 09.09 Collinear chain plane warning
+[ ] 09.10 Draw all triplet normals used for averaging
+[ ] 09.11 Draw rejected/degenerate triplet normals differently
+[ ] 09.12 Plane normal direction flip button
 
 ##########################################################
-# 10. Curve Plane Visualization
+# 10. Guide / Custom Object
 ##########################################################
-[✓] 10.01 Draw curve plane normal
-[✓] 10.02 Add plane flip toggle
-[✓] 10.03 Add average normals toggle
-[ ] 10.04 Draw average curve plane
-[ ] 10.05 Add plane visibility toggle
-[ ] 10.06 Add normal length setting
-[ ] 10.07 Add curve plane stability warning
-[ ] 10.08 Add collinear chain plane warning
-[ ] 10.09 Draw all triplet normals used for averaging
-[ ] 10.10 Draw rejected/degenerate triplet normals differently
-[ ] 10.11 Add plane normal direction flip button
+[✓] 10.01 Guide locator creation
+[✓] 10.02 Guide locator manager functions
+[✓] 10.03 Select Guide button
+[✓] 10.04 Delete Guide button
+[✓] 10.05 Pick Custom Object button
+[✓] 10.06 Custom Object mode uses non-joint selection
+[✓] 10.07 Cached chain survives guide selection
+[✓] 10.08 Draw custom object direction lines
+[✓] 10.09 Draw custom object marker in viewport
+[✓] 10.10 Guide label refresh after create/select/delete/pick
+[✓] 10.11 Guide creation updates custom object cache
+[✓] 10.12 Warning when Custom Object mode has no valid guide
+[ ] 10.13 Auto-refresh when guide moves
+[ ] 10.14 One guide per root option later
+[ ] 10.15 Shared guide mode later
 
 ##########################################################
-# 11. Guide / Custom Object
+# 11. UI / UX Polish
 ##########################################################
-[✓] 11.01 Guide locator creation
-[✓] 11.02 Custom Object mode uses non-joint selection
-[✓] 11.03 Cached chain survives guide selection
-[✓] 11.04 Draw custom object direction lines
-[✓] 11.05 Draw custom object marker in viewport
-[ ] 11.06 Create guide locator manager
-[ ] 11.07 Create select guide button
-[ ] 11.08 Create delete guide button
-[ ] 11.09 Create pick custom object button
-[ ] 11.10 Support any transform as guide object
-[ ] 11.11 Auto-refresh when guide moves
-[ ] 11.12 Add guide name override
-[ ] 11.13 Add guide reuse detection
-[ ] 11.14 Add one guide per root option
-[ ] 11.15 Add shared guide mode
+[✓] 11.01 Compact horizontal configuration layout
+[✓] 11.02 Prevent invalid Primary/Secondary axis pair
+[✓] 11.03 Primary Axis has priority over Secondary Axis
+[✓] 11.04 Clearer cache/preview labels
+[✓] 11.05 Flip Plane / Average Plane Normals / Show Joint Names
+[✓] 11.06 Show Grid / Show Axis Gizmo
+[✓] 11.07 Viewport size controls
+[✓] 11.08 Cache log UI
+[✓] 11.09 Warning label area
+[✓] 11.10 Disable combo keyboard focus/type-to-select behavior
+[ ] 11.11 Collapsible sections
+[ ] 11.12 Status bar
+[ ] 11.13 Compact/expanded UI mode
+[ ] 11.14 Tooltips
+[ ] 11.15 Icons
+[ ] 11.16 Keyboard shortcuts
+[ ] 11.17 Debug panel toggle
 
 ##########################################################
-# 12. UI / UX Polish
+# 12. Diagnostics
 ##########################################################
-[✓] 12.01 Compact horizontal configuration layout
-[✓] 12.02 Prevent invalid Primary/Secondary axis pair
-[✓] 12.03 Primary Axis has priority over Secondary Axis
-[✓] 12.04 Add Flip Plane checkbox
-[✓] 12.05 Add Average Plane Normals checkbox
-[✓] 12.06 Add Show Joint Names checkbox
-[✓] 12.07 Add cache log UI
-[✓] 12.08 Add cache control buttons
-[✓] 12.09 Rename Average Normals to Average Plane Normals
-[✓] 12.10 Rename Refresh From Selection to Set Cache From Selection
-[✓] 12.11 Rename Refresh Preview to Rebuild Preview
-[✓] 12.12 Rename Apply Cached Chain to Apply To Cached Chain
-[ ] 12.13 Add collapsible sections
-[ ] 12.14 Add status bar
-[✓] 12.15 Add warning label area
-[ ] 12.16 Add compact/expanded UI mode
-[ ] 12.17 Add tooltips
-[ ] 12.18 Add icons
-[ ] 12.19 Add keyboard shortcuts
-[ ] 12.20 Add debug panel toggle
+[ ] 12.01 Orientation difference calculation
+[ ] 12.02 Orientation diagnostics
+[ ] 12.03 Orientation heatmap
+[ ] 12.04 Flipped-joint detection
+[ ] 12.05 Collinear-chain detection
+[ ] 12.06 Invalid-plane warnings
+[ ] 12.07 Custom object missing warning in UI
+[ ] 12.08 Preview/apply mismatch warning
+[ ] 12.09 Chain branch warning
+[ ] 12.10 Multi-root summary warning
+[ ] 12.11 Suspicious twist detection
+[ ] 12.12 End-joint orientation warning
+[ ] 12.13 Guide too-close-to-joint warning
+[ ] 12.14 Unstable secondary reference warning
 
 ##########################################################
-# 13. Diagnostics
+# 13. Presets
 ##########################################################
-[ ] 13.01 Add orientation difference calculation
-[ ] 13.02 Add orientation diagnostics
-[ ] 13.03 Add orientation heatmap
-[ ] 13.04 Add flipped-joint detection
-[ ] 13.05 Add collinear-chain detection
-[ ] 13.06 Add invalid-plane warnings
-[ ] 13.07 Add primary/secondary axis conflict warning
-[ ] 13.08 Add custom object missing warning in UI
-[ ] 13.09 Add preview/apply mismatch warning
-[ ] 13.10 Add chain branch warning
-[ ] 13.11 Add multi-root summary warning
-[ ] 13.12 Add suspicious twist detection
-[ ] 13.13 Add end-joint orientation warning
-[ ] 13.14 Add guide too-close-to-joint warning
-[ ] 13.15 Add unstable secondary reference warning
+[ ] 13.01 Finish JOW_core/JOW_presets.py
+[ ] 13.02 Settings to dictionary
+[ ] 13.03 Dictionary to settings
+[ ] 13.04 Save Preset button
+[ ] 13.05 Load Preset button
+[ ] 13.06 Delete Preset button
+[ ] 13.07 Preset dropdown
+[ ] 13.08 Apply loaded preset to UI
+[ ] 13.09 Preset overwrite confirmation
+[ ] 13.10 Preset folder validation
+[ ] 13.11 Preset version field
+[ ] 13.12 Import/export presets
+[ ] 13.13 Preset notes/description field
 
 ##########################################################
 # 14. Built-in Presets
 ##########################################################
-[ ] 14.01 Create biped arm preset
-[ ] 14.02 Create biped leg preset
-[ ] 14.03 Create spine preset
-[ ] 14.04 Create neck preset
-[ ] 14.05 Create tail preset
-[ ] 14.06 Create finger preset
-[ ] 14.07 Create tentacle preset
-[ ] 14.08 Create quadruped front leg preset
-[ ] 14.09 Create quadruped hind leg preset
-[ ] 14.10 Create mechanical chain preset
-[ ] 14.11 Create generic FK chain preset
+[ ] 14.01 Biped arm preset
+[ ] 14.02 Biped leg preset
+[ ] 14.03 Spine preset
+[ ] 14.04 Neck preset
+[ ] 14.05 Tail preset
+[ ] 14.06 Finger preset
+[ ] 14.07 Tentacle preset
+[ ] 14.08 Quadruped front leg preset
+[ ] 14.09 Quadruped hind leg preset
+[ ] 14.10 Mechanical chain preset
+[ ] 14.11 Generic FK chain preset
 
 ##########################################################
 # 15. Mirroring
 ##########################################################
-[ ] 15.01 Add mirror orientation preview
-[ ] 15.02 Add mirror orientation apply
-[ ] 15.03 Add left-right chain pairing
-[ ] 15.04 Add naming rule detection
-[ ] 15.05 Add L/R side token settings
-[ ] 15.06 Add mirrored preview color coding
-[ ] 15.07 Add mirror plane setting
-[ ] 15.08 Add mirror axis setting
+[ ] 15.01 Mirror orientation preview
+[ ] 15.02 Mirror orientation apply
+[ ] 15.03 Left-right chain pairing
+[ ] 15.04 Naming rule detection
+[ ] 15.05 L/R side token settings
+[ ] 15.06 Mirrored preview color coding
+[ ] 15.07 Mirror plane / mirror axis settings
 
 ##########################################################
 # 16. Advanced Preview Madness
 ##########################################################
-[ ] 16.01 Add test geometry generation
-[ ] 16.02 Add deformation preview
-[ ] 16.03 Add twist preview visualization
-[ ] 16.04 Add twist distribution graph
-[ ] 16.05 Add orientation delta labels
-[ ] 16.06 Add per-joint axis length scaling
-[ ] 16.07 Add temporary skin preview mode
-[ ] 16.08 Add before/after orientation comparison
-[ ] 16.09 Add ghost current local axes
-[ ] 16.10 Add ghost preview local axes
+[ ] 16.01 Test geometry generation
+[ ] 16.02 Deformation preview
+[ ] 16.03 Twist preview visualization
+[ ] 16.04 Twist distribution graph
+[ ] 16.05 Orientation delta labels
+[ ] 16.06 Temporary skin preview mode
+[ ] 16.07 Before/after orientation comparison
+[ ] 16.08 Ghost current local axes
+[ ] 16.09 Ghost preview local axes
 
 ##########################################################
 # 17. Export / Utility
 ##########################################################
-[ ] 17.01 Add viewport screenshot export
-[ ] 17.02 Add settings export
-[ ] 17.03 Add preset export
-[ ] 17.04 Add preset import
-[ ] 17.05 Add copy settings to clipboard
-[ ] 17.06 Add debug dump button
-[ ] 17.07 Add clean temporary nodes button
-[ ] 17.08 Add save viewport image button
-[ ] 17.09 Add export preview data as JSON
+[ ] 17.01 Viewport screenshot export
+[ ] 17.02 Settings export
+[ ] 17.03 Preset import/export
+[ ] 17.04 Copy settings to clipboard
+[ ] 17.05 Debug dump button
+[ ] 17.06 Clean temporary nodes button
+[ ] 17.07 Export preview data as JSON
 
 ##########################################################
 # 18. Polish / Productization
 ##########################################################
-[ ] 18.01 Create About dialog
-[ ] 18.02 Add version system
-[ ] 18.03 Add changelog system
-[ ] 18.04 Add tool header/logo area
-[ ] 18.05 Add known limitations section
-[ ] 18.06 Add startup sanity check
-[ ] 18.07 Add module path sanity check
-[ ] 18.08 Add missing dependency warnings
-[ ] 18.09 Add internal logger
-[ ] 18.10 Add dev mode toggle
+[ ] 18.01 About dialog
+[ ] 18.02 Version system
+[ ] 18.03 Changelog system
+[ ] 18.04 Tool header/logo area
+[ ] 18.05 Known limitations section
+[ ] 18.06 Startup sanity check
+[ ] 18.07 Module path sanity check
+[ ] 18.08 Missing dependency warnings
+[ ] 18.09 Internal logger
+[ ] 18.10 Dev mode toggle
 
 ##########################################################
-# 19. Active Sprint: Stability / Clarity Pass
+# 19. Done Sprint: Stability / Clarity Pass
 ##########################################################
-[✓] 19.01 Rename UI controls for clarity
-[✓] 19.02 Replace orientation result dictionaries with JointOrientation dataclass
-[✓] 19.03 Add chain length guard
-[✓] 19.04 Add zero-length forward guard
-[✓] 19.05 Add nested-safe undo depth system
-[✓] 19.06 Add cached root existence validation
-[✓] 19.07 Add warning label area
-[✓] 19.08 Add selected cached root interaction
-[✓] 19.09 Add Set Cache From Selection naming cleanup
-[✓] 19.10 Add Rebuild Preview naming cleanup
-[✓] 19.11 Rename Lock Chain to Lock Cached Chain
-[✓] 19.12 Clean duplicated cache helper methods
-[✓] 19.13 Add warning when cached roots were removed because they no longer exist
+[✓] 19.01 UI naming cleanup
+[✓] 19.02 JointOrientation dataclass
+[✓] 19.03 Chain length guard
+[✓] 19.04 Zero-length forward guard
+[✓] 19.05 Nested-safe undo depth system
+[✓] 19.06 Cached root validation
+[✓] 19.07 Warning label area
+[✓] 19.08 Duplicated cache helper cleanup
+[✓] 19.09 Removed cached-root warning
+
+##########################################################
+# 20. Done Sprint: Viewport Polish Pass
+##########################################################
+[✓] 20.01 Viewport grid
+[✓] 20.02 Mini axis gizmo
+[✓] 20.03 Mini axis gizmo ZY correction
+[✓] 20.04 Axis labels
+[✓] 20.05 Axis length setting
+[✓] 20.06 Joint size setting
+[✓] 20.07 Normal length setting
+[✓] 20.08 Frame Preview button
+[✓] 20.09 Frame Selected button
+[✓] 20.10 Disable combo-key hijacking behavior
+
+##########################################################
+# 21. Done Sprint: Guide Manager Pass
+##########################################################
+[✓] 21.01 Create guide locator manager functions
+[✓] 21.02 Add Select Guide button
+[✓] 21.03 Add Delete Guide button
+[✓] 21.04 Add Pick Custom Object button
+[✓] 21.05 Make guide creation update custom object cache automatically
+[✓] 21.06 Add warning when Custom Object mode has no valid guide
+[✓] 21.07 Add current guide label refresh after create/select/delete/pick
+[ ] 21.08 Add guide auto-refresh when moved later
+
+##########################################################
+# 22. Active Sprint: Spatial Diagnostics Pass
+##########################################################
+[ ] 22.01 Replace bounds-centered viewport projection with camera-target projection
+[ ] 22.02 Add real world-space grid
+[ ] 22.03 Add world origin axes/grid emphasis
+[ ] 22.04 Add Orient End Joint toggle
+[ ] 22.05 Add current joint orientation data
+[ ] 22.06 Draw current local axes as ghost axes
+[ ] 22.07 Add Show Current Axes toggle
+[ ] 22.08 Add Show Preview Axes toggle
+[ ] 22.09 Calculate orientation difference per joint
+[ ] 22.10 Add orientation difference readout to overlay
+[ ] 22.11 Add selected joint info overlay
+[ ] 22.12 Add guide picking from viewport
+[ ] 22.13 Add guide movement refresh later
