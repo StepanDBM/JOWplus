@@ -88,7 +88,7 @@ class JOWWindow(QtWidgets.QDialog):
 
         self.cached_guide_label = QtWidgets.QLabel("Guide: None")
 
-        self.lock_selection_checkbox = QtWidgets.QCheckBox("Lock Chain")
+        self.lock_selection_checkbox = QtWidgets.QCheckBox("Lock Cached Chain")
         self.apply_cached_chain_checkbox = QtWidgets.QCheckBox("Apply to Cached Chain")
         self.apply_cached_chain_checkbox.setChecked(True)
 
@@ -229,6 +229,8 @@ class JOWWindow(QtWidgets.QDialog):
 
 
     def update_cache_labels(self):
+        removed_count = JOW_preview.validate_cache_and_get_removed_count()
+
         roots = JOW_preview.get_cached_roots()
         custom_object = JOW_preview.get_cached_custom_object()
 
@@ -253,6 +255,11 @@ class JOWWindow(QtWidgets.QDialog):
             )
         else:
             self.cached_guide_label.setText("Guide: None")
+
+        if removed_count > 0:
+            self.set_warning(
+                "{} cached root(s) no longer exist and were removed.".format(removed_count)
+            )
 
     def get_next_axis_except(self, forbidden_axis, current_axis=None):
         axes = self.AXES[:]

@@ -31,12 +31,12 @@
 [✓] 02.02 Create JOW_core/JOW_utils/JOW_undo.py
 [✓] 02.03 Decorate orientation actions with undo_chunk
 [✓] 02.04 Decorate guide creation with undo_chunk
-[ ] 02.05 Add nested-safe undo depth system
+[✓] 02.05 Add nested-safe undo depth system
 [ ] 02.06 Add operation failure cleanup checks
 [ ] 02.07 Add temporary node cleanup validator
 [ ] 02.08 Add safe temp node naming system
 [ ] 02.09 Add emergency cleanup function
-[ ] 02.10 Add warning when no valid joints are found
+[✓] 02.10 Add warning when no valid joints are found
 
 ##########################################################
 # 03. Settings / Data
@@ -70,9 +70,9 @@
 [✓] 04.09 Add flip plane support in math
 [✓] 04.10 Add average normals toggle support in math
 [✓] 04.11 Make Apply optionally use cached roots
-[ ] 04.12 Replace orientation result dictionaries with JointOrientation dataclass
-[ ] 04.13 Add chain length guard
-[ ] 04.14 Add zero-length forward guard
+[✓] 04.12 Replace orientation result dictionaries with JointOrientation dataclass
+[✓] 04.13 Add chain length guard
+[✓] 04.14 Add zero-length forward guard
 [ ] 04.15 Add optional orient-end-joint setting
 [ ] 04.16 Add optional preserve-end-joint-orientation setting
 [ ] 04.17 Add branch-chain handling strategy
@@ -92,7 +92,7 @@
 [✓] 05.08 Add Set Cache From Selection / Refresh From Selection button
 [✓] 05.09 Add Apply To Cached Chain toggle
 [✓] 05.10 Add Lock Chain toggle
-[ ] 05.11 Add warning if cached roots no longer exist
+[✓] 05.11 Add warning if cached roots no longer exist
 [ ] 05.12 Add cached root row selection
 [ ] 05.13 Add remove single cached root button
 [ ] 05.14 Add double-click cached root to select it in Maya
@@ -239,17 +239,17 @@
 [✓] 12.02 Prevent invalid Primary/Secondary axis pair
 [✓] 12.03 Primary Axis has priority over Secondary Axis
 [✓] 12.04 Add Flip Plane checkbox
-[✓] 12.05 Add Average Normals checkbox
+[✓] 12.05 Add Average Plane Normals checkbox
 [✓] 12.06 Add Show Joint Names checkbox
 [✓] 12.07 Add cache log UI
 [✓] 12.08 Add cache control buttons
-[ ] 12.09 Rename Average Normals to Average Plane Normals
-[ ] 12.10 Rename Refresh From Selection to Set Cache From Selection
-[ ] 12.11 Rename Refresh Preview to Rebuild Preview
-[ ] 12.12 Rename Apply Cached Chain to Apply To Cached Chain
+[✓] 12.09 Rename Average Normals to Average Plane Normals
+[✓] 12.10 Rename Refresh From Selection to Set Cache From Selection
+[✓] 12.11 Rename Refresh Preview to Rebuild Preview
+[✓] 12.12 Rename Apply Cached Chain to Apply To Cached Chain
 [ ] 12.13 Add collapsible sections
 [ ] 12.14 Add status bar
-[ ] 12.15 Add warning label area
+[✓] 12.15 Add warning label area
 [ ] 12.16 Add compact/expanded UI mode
 [ ] 12.17 Add tooltips
 [ ] 12.18 Add icons
@@ -344,15 +344,18 @@
 [ ] 18.10 Add dev mode toggle
 
 ##########################################################
-# 19. Suggested Next Sprint
+# 19. Active Sprint: Stability / Clarity Pass
 ##########################################################
-[ ] 19.01 Rename UI controls for clarity
-[ ] 19.02 Replace orientation result dictionaries with JointOrientation dataclass
-[ ] 19.03 Add chain length guard
-[ ] 19.04 Add zero-length forward guard
-[ ] 19.05 Add nested-safe undo depth system
-[ ] 19.06 Add cached root existence validation
-[ ] 19.07 Add warning label area
-[ ] 19.08 Add selected cached root interaction
-[ ] 19.09 Add Set Cache From Selection naming cleanup
-[ ] 19.10 Add Rebuild Preview naming cleanup
+[✓] 19.01 Rename UI controls for clarity
+[✓] 19.02 Replace orientation result dictionaries with JointOrientation dataclass
+[✓] 19.03 Add chain length guard
+[✓] 19.04 Add zero-length forward guard
+[✓] 19.05 Add nested-safe undo depth system
+[✓] 19.06 Add cached root existence validation
+[✓] 19.07 Add warning label area
+[✓] 19.08 Add selected cached root interaction
+[✓] 19.09 Add Set Cache From Selection naming cleanup
+[✓] 19.10 Add Rebuild Preview naming cleanup
+[✓] 19.11 Rename Lock Chain to Lock Cached Chain
+[✓] 19.12 Clean duplicated cache helper methods
+[✓] 19.13 Add warning when cached roots were removed because they no longer exist
