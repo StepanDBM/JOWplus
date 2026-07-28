@@ -23,6 +23,14 @@ class JOWViewport(QtWidgets.QFrame):
         self.mouse_press_pos = None
         self.projection_mode = "XY"
 
+        self.show_grid = True
+        self.show_axis_gizmo = True
+
+        self.axis_length = 28
+        self.joint_size = 5
+        self.selected_joint_size = 8
+        self.normal_length = 60
+
         self.selected_joint = None
         self.click_threshold = 6
         self.pick_threshold = 14
@@ -43,6 +51,16 @@ class JOWViewport(QtWidgets.QFrame):
         self.setFrameShape(QtWidgets.QFrame.StyledPanel)
         self.setStyleSheet("background-color: #202020;")
 
+    def vector_from_components(self, x, y, z):
+        class SimpleVector:
+            pass
+
+        vector = SimpleVector()
+        vector.x = x
+        vector.y = y
+        vector.z = z
+
+        return vector
 
     def set_secondary_mode(self, mode):
         self.secondary_mode = mode
@@ -50,12 +68,27 @@ class JOWViewport(QtWidgets.QFrame):
     def set_preview_chains(self, preview_chains):
         self.preview_chains = preview_chains
         self.update()
-
     def set_show_joint_names(self, state):
         self.show_joint_names = state
         self.update()
     def set_selected_joint(self, joint_name):
         self.selected_joint = joint_name
+        self.update()
+    def set_show_grid(self, state):
+        self.show_grid = state
+        self.update()
+    def set_show_axis_gizmo(self, state):
+        self.show_axis_gizmo = state
+        self.update()
+    def set_axis_length(self, value):
+        self.axis_length = value
+        self.update()
+    def set_joint_size(self, value):
+        self.joint_size = value
+        self.selected_joint_size = value + 3
+        self.update()
+    def set_normal_length(self, value):
+        self.normal_length = value
         self.update()
 
     def paintEvent(self, event):
@@ -81,12 +114,12 @@ class JOWViewport(QtWidgets.QFrame):
         bounds = self.get_bounds(points)
         scale = self.get_scale(bounds, rect)
 
-        for chain in self.preview_chains:
-            self.draw_chain(painter, chain, bounds, scale, rect)
+        self.draw_grid(painter, rect)
 
         for chain in self.preview_chains:
             self.draw_chain(painter, chain, bounds, scale, rect)
 
+        self.draw_axis_gizmo(painter, rect)
         self.draw_overlay(painter, rect)
 
         painter.end()
@@ -145,6 +178,73 @@ class JOWViewport(QtWidgets.QFrame):
 
         return QtCore.QPointF(x, y)
 
+
+    def draw_grid(self, painter, rect):
+        if not self.show_grid:
+            return
+
+        spacing = 40
+
+        painter.setPen(QtGui.QPen(QtGui.QColor(45, 45, 45), 1))
+
+        start_x = int(self.pan.x()) % spacing
+        start_y = int(self.pan.y()) % spacing
+
+        x = start_x
+
+        while x < rect.width():
+            painter.drawLine(x, 0, x, rect.height())
+            x += spacing
+
+        y = start_y
+
+        while y < rect.height():
+            painter.drawLine(0, y, rect.width(), y)
+            y += spacing
+
+        painter.setPen(QtGui.QPen(QtGui.QColor(70, 70, 70), 1))
+
+        painter.drawLine(rect.center().x() + self.pan.x(), 0, rect.center().x() + self.pan.x(), rect.height())
+        painter.drawLine(0, rect.center().y() + self.pan.y(), rect.width(), rect.center().y() + self.pan.y())
+
+    def draw_axis_gizmo(self, painter, rect):
+        if not self.show_axis_gizmo:
+            return
+
+        origin = QtCore.QPointF(
+            rect.right() - 70,
+            rect.bottom() - 55
+        )
+
+        length = 32
+
+        axes = [
+            ("X", self.vector_from_components(1, 0, 0), QtGui.QColor(255, 80, 80)),
+            ("Y", self.vector_from_components(0, 1, 0), QtGui.QColor(80, 255, 80)),
+            ("Z", self.vector_from_components(0, 0, 1), QtGui.QColor(80, 140, 255))
+        ]
+
+        for label, axis, color in axes:
+            axis_a, axis_b = self.project_gizmo_axis(axis, label)
+
+            end = QtCore.QPointF(
+                origin.x() + axis_a * length,
+                origin.y() - axis_b * length
+            )
+
+            painter.setPen(QtGui.QPen(color, 2))
+            painter.drawLine(origin, end)
+
+            painter.setPen(color)
+            painter.drawText(
+                end + QtCore.QPointF(4, -4),
+                label
+            )
+
+        painter.setPen(QtGui.QPen(QtGui.QColor(220, 220, 220), 1))
+        painter.setBrush(QtGui.QBrush(QtGui.QColor(220, 220, 220)))
+        painter.drawEllipse(origin, 3, 3)
+
     def draw_chain(self, painter, chain, bounds, scale, rect):
         self.draw_bones(painter, chain, bounds, scale, rect)
         self.draw_axes(painter, chain, bounds, scale, rect)
@@ -174,23 +274,46 @@ class JOWViewport(QtWidgets.QFrame):
             if joint.name == self.selected_joint:
                 painter.setPen(QtGui.QPen(QtGui.QColor(255, 255, 255), 2))
                 painter.setBrush(QtGui.QBrush(QtGui.QColor(255, 90, 40)))
-                painter.drawEllipse(point, 8, 8)
+                painter.drawEllipse(point, self.selected_joint_size, self.selected_joint_size)
             else:
                 painter.setPen(QtGui.QPen(QtGui.QColor(255, 255, 255), 1))
                 painter.setBrush(QtGui.QBrush(QtGui.QColor(255, 210, 80)))
-                painter.drawEllipse(point, 5, 5)
+                painter.drawEllipse(point, self.joint_size, self.joint_size)
 
     def draw_axes(self, painter, chain, bounds, scale, rect):
-        axis_length = 28
-
         for joint in chain.joints:
             origin = self.project_point(joint.position, bounds, scale, rect)
 
-            self.draw_axis(painter, origin, joint.x_axis, axis_length, QtGui.QColor(255, 80, 80))
-            self.draw_axis(painter, origin, joint.y_axis, axis_length, QtGui.QColor(80, 255, 80))
-            self.draw_axis(painter, origin, joint.z_axis, axis_length, QtGui.QColor(80, 140, 255))
+            show_labels = (joint.name == self.selected_joint)
 
-    def draw_axis(self, painter, origin, axis, length, color):
+            self.draw_axis(
+                painter,
+                origin,
+                joint.x_axis,
+                self.axis_length,
+                QtGui.QColor(255, 80, 80),
+                "X" if show_labels else None
+            )
+
+            self.draw_axis(
+                painter,
+                origin,
+                joint.y_axis,
+                self.axis_length,
+                QtGui.QColor(80, 255, 80),
+                "Y" if show_labels else None
+            )
+
+            self.draw_axis(
+                painter,
+                origin,
+                joint.z_axis,
+                self.axis_length,
+                QtGui.QColor(80, 140, 255),
+                "Z" if show_labels else None
+            )
+
+    def draw_axis(self, painter, origin, axis, length, color, label=None):
         if not axis:
             return
 
@@ -204,6 +327,13 @@ class JOWViewport(QtWidgets.QFrame):
         )
 
         painter.drawLine(origin, end)
+
+        if label:
+            painter.setPen(color)
+            painter.drawText(
+                end + QtCore.QPointF(4, -4),
+                label
+            )
 
     def draw_curve_plane_normal(self, painter, chain, bounds, scale, rect):
         if self.secondary_mode != "Curve Plane":
@@ -219,7 +349,7 @@ class JOWViewport(QtWidgets.QFrame):
 
         axis_a, axis_b = self.project_axis(chain.curve_plane_normal)
 
-        length = 60
+        length = self.normal_length
 
         end = QtCore.QPointF(
             origin.x() + axis_a * length,
@@ -253,7 +383,7 @@ class JOWViewport(QtWidgets.QFrame):
 
         painter.setPen(QtGui.QPen(QtGui.QColor(255, 180, 60), 2))
 
-        length = 45
+        length = self.normal_length
 
         for previous_normal in chain.previous_normals:
             if not previous_normal.position:
@@ -385,7 +515,6 @@ class JOWViewport(QtWidgets.QFrame):
 
         return point.x, point.y
 
-
     def project_axis(self, axis):
         if self.projection_mode == "XY":
             return axis.x, axis.y
@@ -401,6 +530,45 @@ class JOWViewport(QtWidgets.QFrame):
             return x, y
 
         return axis.x, axis.y
+
+    def project_gizmo_axis(self, axis, label):
+        axis_a, axis_b = self.project_axis(axis)
+
+        if self.projection_mode == "ZY" and label == "Z":
+            axis_a *= -1
+
+        return axis_a, axis_b
+
+    def frame_preview(self):
+        self.zoom = 1.0
+        self.pan = QtCore.QPointF(0, 0)
+        self.update()
+
+
+    def frame_selected_joint(self):
+        if not self.selected_joint:
+            return
+
+        bounds, scale, rect = self.get_current_view_data()
+
+        if not bounds:
+            return
+
+        for chain in self.preview_chains:
+            for joint in chain.joints:
+                if joint.name != self.selected_joint:
+                    continue
+
+                point = self.project_point(joint.position, bounds, scale, rect)
+
+                self.pan += QtCore.QPointF(
+                    rect.center().x() - point.x(),
+                    rect.center().y() - point.y()
+                )
+
+                self.update()
+                return
+
 
     ##########################################################
     # Viewport Control

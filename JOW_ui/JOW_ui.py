@@ -131,6 +131,14 @@ class JOWWindow(QtWidgets.QDialog):
         reset_view_btn = QtWidgets.QPushButton("Reset View")
         reset_view_btn.clicked.connect(self.reset_view)
 
+        frame_preview_btn = QtWidgets.QPushButton("Frame Preview")
+        frame_preview_btn.clicked.connect(self.frame_preview)
+        viewport_controls_layout.addWidget(frame_preview_btn)
+
+        frame_selected_btn = QtWidgets.QPushButton("Frame Selected")
+        frame_selected_btn.clicked.connect(self.frame_selected_joint)
+        viewport_controls_layout.addWidget(frame_selected_btn)
+
         viewport_controls_layout.addWidget(reset_view_btn)
         layout.addLayout(viewport_controls_layout)
 
@@ -142,14 +150,48 @@ class JOWWindow(QtWidgets.QDialog):
         self.flip_plane_checkbox = QtWidgets.QCheckBox("Flip Plane")
         self.average_normals_checkbox = QtWidgets.QCheckBox("Average Plane Normals")
         self.show_joint_names_checkbox = QtWidgets.QCheckBox("Show Joint Names")
+        self.show_grid_checkbox = QtWidgets.QCheckBox("Show Grid")
+        self.show_axis_gizmo_checkbox = QtWidgets.QCheckBox("Show Axis Gizmo")
 
         self.average_normals_checkbox.setChecked(True)
+        self.show_grid_checkbox.setChecked(True)
+        self.show_axis_gizmo_checkbox.setChecked(True)
 
         options_layout.addWidget(self.flip_plane_checkbox)
         options_layout.addWidget(self.average_normals_checkbox)
         options_layout.addWidget(self.show_joint_names_checkbox)
+        options_layout.addWidget(self.show_grid_checkbox)
+        options_layout.addWidget(self.show_axis_gizmo_checkbox)
 
         layout.addLayout(options_layout)
+
+        ##########################################################
+        # Viewport Sizes
+        ##########################################################
+        viewport_size_layout = QtWidgets.QHBoxLayout()
+
+        viewport_size_layout.addWidget(QtWidgets.QLabel("Axis Length"))
+
+        self.axis_length_spinbox = QtWidgets.QSpinBox()
+        self.axis_length_spinbox.setRange(5, 200)
+        self.axis_length_spinbox.setValue(28)
+        viewport_size_layout.addWidget(self.axis_length_spinbox)
+
+        viewport_size_layout.addWidget(QtWidgets.QLabel("Joint Size"))
+
+        self.joint_size_spinbox = QtWidgets.QSpinBox()
+        self.joint_size_spinbox.setRange(2, 30)
+        self.joint_size_spinbox.setValue(5)
+        viewport_size_layout.addWidget(self.joint_size_spinbox)
+
+        viewport_size_layout.addWidget(QtWidgets.QLabel("Normal Length"))
+
+        self.normal_length_spinbox = QtWidgets.QSpinBox()
+        self.normal_length_spinbox.setRange(5, 300)
+        self.normal_length_spinbox.setValue(60)
+        viewport_size_layout.addWidget(self.normal_length_spinbox)
+
+        layout.addLayout(viewport_size_layout)
 
         ##########################################################
         # Viewport
@@ -193,6 +235,8 @@ class JOWWindow(QtWidgets.QDialog):
 
         self.update_axis_combo_options()
         self.update_cache_labels()
+        self.update_viewport_display_options()
+        self.update_viewport_sizes()
         self.connect_signals()
 
     def get_settings(self):
@@ -260,6 +304,37 @@ class JOWWindow(QtWidgets.QDialog):
             self.set_warning(
                 "{} cached root(s) no longer exist and were removed.".format(removed_count)
             )
+
+    def update_viewport_display_options(self):
+        self.viewport.set_show_grid(
+            self.show_grid_checkbox.isChecked()
+        )
+
+        self.viewport.set_show_axis_gizmo(
+            self.show_axis_gizmo_checkbox.isChecked()
+        )
+
+
+    def update_viewport_sizes(self):
+        self.viewport.set_axis_length(
+            self.axis_length_spinbox.value()
+        )
+
+        self.viewport.set_joint_size(
+            self.joint_size_spinbox.value()
+        )
+
+        self.viewport.set_normal_length(
+            self.normal_length_spinbox.value()
+        )
+
+
+    def frame_preview(self):
+        self.viewport.frame_preview()
+
+
+    def frame_selected_joint(self):
+        self.viewport.frame_selected_joint()
 
     def get_next_axis_except(self, forbidden_axis, current_axis=None):
         axes = self.AXES[:]
@@ -404,6 +479,13 @@ class JOWWindow(QtWidgets.QDialog):
 
         self.lock_selection_checkbox.stateChanged.connect(self.on_lock_selection_changed)
         self.apply_cached_chain_checkbox.stateChanged.connect(self.refresh_preview)
+
+        self.show_grid_checkbox.stateChanged.connect(self.update_viewport_display_options)
+        self.show_axis_gizmo_checkbox.stateChanged.connect(self.update_viewport_display_options)
+
+        self.axis_length_spinbox.valueChanged.connect(self.update_viewport_sizes)
+        self.joint_size_spinbox.valueChanged.connect(self.update_viewport_sizes)
+        self.normal_length_spinbox.valueChanged.connect(self.update_viewport_sizes)
 
     def create_guide(self):
         JOW_guides.create_guide()
