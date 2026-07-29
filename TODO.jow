@@ -1,3 +1,9 @@
+LEGEND
+[✓] Done / implemented
+[~] Implemented but needs cleanup or verification
+[ ] Not done yet
+
+
 ##########################################################
 # 01. Foundation / Architecture
 ##########################################################
@@ -11,6 +17,22 @@
 [✓] 01.08 Data classes started in JOW_data.py
 [✓] 01.09 Preview system started in JOW_preview.py
 [✓] 01.10 Viewport system started in JOW_viewport.py
+[✓] 01.11 Drawable layer created
+[✓] 01.12 JOWAxisDrawer extracted
+[✓] 01.13 JOWJointDrawer extracted
+[✓] 01.14 JOWGuideDrawer extracted
+[✓] 01.15 JOWGridDrawer extracted
+[✓] 01.16 JOWOverlayDrawer extracted
+[✓] 01.17 JOWPlaneDrawer extracted
+[✓] 01.18 Bootstrap reload list updated for drawable modules
+[✓] 01.19 JOW_widgets package created
+[✓] 01.20 Widget utility module created
+[✓] 01.21 Tool panel extracted
+[✓] 01.22 Cache panel extracted
+[✓] 01.23 Settings panel extracted
+[~] 01.24 Action bar scaffold exists
+[✓] 01.25 Bootstrap reload list updated for widget modules
+
 
 ##########################################################
 # 02. Orientation Core
@@ -29,10 +51,14 @@
 [✓] 02.12 JointOrientation dataclass result system
 [✓] 02.13 Chain length and zero-length guards
 [✓] 02.14 Apply optionally uses cached roots
-[ ] 02.15 Add optional orient-end-joint setting
+[✓] 02.15 Add optional orient-end-joint setting
 [ ] 02.16 Add branch-chain handling strategy
 [ ] 02.17 Add multi-root orientation summary
 [ ] 02.18 Add negative primary/secondary axes later
+[ ] 02.19 Add branch-safe chain extraction mode
+[ ] 02.20 Add leaf-chain-only processing option
+[ ] 02.21 Add warning before applying to flattened branch hierarchy
+
 
 ##########################################################
 # 03. Undo / Safety
@@ -46,6 +72,10 @@
 [ ] 03.07 Temporary node cleanup validator
 [ ] 03.08 Safe temp node naming system
 [ ] 03.09 Emergency cleanup function
+[ ] 03.10 Convert SDBM_orient_tmp into safer unique temp name
+[ ] 03.11 Validate temp transform deletion after failed orientConstraint
+[ ] 03.12 Add cleanup command for orphan temporary nodes
+
 
 ##########################################################
 # 04. Settings / Data
@@ -57,13 +87,19 @@
 [✓] 04.05 average_normals setting
 [✓] 04.06 cached roots setting
 [✓] 04.07 JointOrientation dataclass
-[ ] 04.08 Move settings gathering fully out of UI
-[ ] 04.09 Settings serialization
-[ ] 04.10 Settings validation helper
-[ ] 04.11 Default settings factory
-[ ] 04.12 Reset-to-defaults button
-[ ] 04.13 Settings copy/paste
-[ ] 04.14 Versioned settings data
+[✓] 04.08 orient_end_joint setting
+[~] 04.09 Move settings gathering fully out of UI
+[ ] 04.10 Settings serialization
+[ ] 04.11 Settings validation helper
+[ ] 04.12 Default settings factory
+[ ] 04.13 Reset-to-defaults button
+[ ] 04.14 Settings copy/paste
+[ ] 04.15 Versioned settings data
+[ ] 04.16 Add settings-to-dict helper
+[ ] 04.17 Add dict-to-settings helper
+[ ] 04.18 Add UI apply-settings helper
+[ ] 04.19 Add settings snapshot for preview/apply mismatch detection
+
 
 ##########################################################
 # 05. Selection / Cache System
@@ -80,10 +116,25 @@
 [✓] 05.10 Lock Cached Chain toggle
 [✓] 05.11 Cached root existence validation
 [✓] 05.12 Warning when cached roots were removed
-[ ] 05.13 Cached root row selection
-[ ] 05.14 Remove single cached root button
-[ ] 05.15 Double-click cached root to select it in Maya
-[ ] 05.16 Lock-selection visual state in viewport
+[✓] 05.13 Green Set Cache From Selection prompt when cache is empty and a joint is selected
+[✓] 05.14 Reset Set Cache From Selection button style after caching selection
+[✓] 05.15 Re-highlight Set Cache button after cache clear if joint selection remains
+[✓] 05.16 Empty-click viewport deselect without touching cache
+[✓] 05.17 Cached root row selection
+[✓] 05.18 Remove selected cached root button
+[✓] 05.19 Double-click cached root to select it in Maya
+[~] 05.20 Lock-selection visual state in viewport
+[✓] 05.21 Cache prompt tooltip polish
+[~] 05.22 Separate root-cache state from preview-root auto-discovery more cleanly
+[ ] 05.23 Cache selected roots without auto-refresh option
+[✓] 05.24 Add Selection appends roots to cache
+[✓] 05.25 Set Cache From Selection replaces root cache
+[✓] 05.26 Cache list preserves row selection through display refresh
+[~] 05.27 Native Maya LRA follows cached-root changes
+[ ] 05.28 Add cached guide remove button
+[ ] 05.29 Add cache context menu
+[ ] 05.30 Consider switching QListWidget to QTreeWidget / proto-outliner
+
 
 ##########################################################
 # 06. Preview Data
@@ -97,11 +148,17 @@
 [✓] 06.07 Custom object preview data
 [✓] 06.08 Previous-mode normal preview data
 [✓] 06.09 Preview built from compute_chain_orientation()
-[ ] 06.10 PreviewPlane data structure
-[ ] 06.11 PreviewDiagnostic data structure
-[ ] 06.12 PreviewWarning data structure
-[ ] 06.13 Current-orientation preview data
-[ ] 06.14 Before/after preview pairing
+[✓] 06.10 Current-orientation preview data
+[✓] 06.11 Before/after preview pairing at joint-axis level
+[ ] 06.12 PreviewPlane data structure
+[ ] 06.13 PreviewDiagnostic data structure
+[ ] 06.14 PreviewWarning data structure
+[ ] 06.15 PreviewBranch data structure
+[ ] 06.16 PreviewTripletNormal data structure
+[ ] 06.17 PreviewRejectedNormal data structure
+[ ] 06.18 Preview guide distance metrics
+[ ] 06.19 Preview/apply settings snapshot data
+
 
 ##########################################################
 # 07. Viewport
@@ -117,20 +174,46 @@
 [✓] 07.09 Select Maya joint from JOW viewport
 [✓] 07.10 Highlight selected joint
 [✓] 07.11 Zoom / pan / reset view
-[✓] 07.12 Projection modes: XY / XZ / ZY / Orbit
+[✓] 07.12 Projection modes: Orbit / XY / XZ / ZY
 [✓] 07.13 Fake orbit mode
-[✓] 07.14 Viewport grid
+[✓] 07.14 Projected world-space grid
 [✓] 07.15 Mini axis gizmo
 [✓] 07.16 Mini axis gizmo Z flip fixed in ZY projection
 [✓] 07.17 Axis labels for selected joint
 [✓] 07.18 Axis / joint / normal size controls
 [✓] 07.19 Frame Preview button
 [✓] 07.20 Frame Selected button
-[ ] 07.21 Bone thickness setting
-[ ] 07.22 Viewport background color setting
-[ ] 07.23 Viewport color settings
-[ ] 07.24 True 3D viewport later
-[ ] 07.25 Proper orbit camera later
+[✓] 07.21 Camera-target projection / view center system
+[✓] 07.22 World grid origin axis emphasis
+[✓] 07.23 3D Joints toggle
+[✓] 07.24 Pyramid-style projected joint/bone drawing
+[✓] 07.25 Viewport split into drawable classes
+[✓] 07.26 Guide picking from viewport
+[✓] 07.27 Vertical splitter layout for resizable viewport
+[✓] 07.28 Draw current local axes as ghost axes
+[✓] 07.29 Draw preview local axes as proposed axes
+[✓] 07.30 Show Current Axes toggle
+[✓] 07.31 Show Preview Axes toggle
+[✓] 07.32 Selected joint ring colored by orientation delta
+[✓] 07.33 Delta heatmap rings for all joints
+[✓] 07.34 Guide selected visual halo
+[✓] 07.35 Empty-click deselect from viewport
+[ ] 07.36 Bone thickness setting
+[ ] 07.37 Viewport background color setting
+[ ] 07.38 Viewport color settings
+[ ] 07.39 True 3D viewport later
+[ ] 07.40 Proper orbit camera later
+[ ] 07.41 Add viewport selection mode summary
+[~] 07.42 Add heatmap legend in viewport corner
+[ ] 07.43 Add branch warning visual markers
+[ ] 07.44 Add guide-too-close visual marker
+[ ] 07.45 Add per-joint delta labels toggle
+[✓] 07.46 Add selected guide frame support
+[✓] 07.47 Frame Selected supports selected guide / focused item
+[ ] 07.48 Add viewport screenshot capture
+[✓] 07.49 Frame Preview / Frame Selected orbit target follows framed focus
+[✓] 07.50 Reset View restores orbit target to world origin
+
 
 ##########################################################
 # 08. Live Updates
@@ -143,12 +226,26 @@
 [✓] 08.06 Auto-refresh for viewport display settings
 [✓] 08.07 Preview survives non-joint object selection
 [✓] 08.08 Combo keyboard/type-to-select disabled
-[ ] 08.09 Auto-refresh when Maya selection changes
-[ ] 08.10 Auto-refresh when guide moves
-[ ] 08.11 Silent refresh mode when nothing is selected
-[ ] 08.12 Refresh throttling/debounce
-[ ] 08.13 Live preview toggle
-[ ] 08.14 Pause preview updates toggle
+[✓] 08.09 Auto-refresh when Show Plane changes
+[✓] 08.10 Auto-refresh when 3D Joints changes
+[✓] 08.11 Auto-refresh when Orient End Joint changes
+[✓] 08.12 Display-only refresh for Current/Preview Axes toggles
+[✓] 08.13 Display-only refresh for Delta Heatmap toggle
+[✓] 08.14 Display-only refresh for Overlay toggle
+[✓] 08.15 Maya SelectionChanged scriptJob updates Set Cache button prompt
+[~] 08.16 Maya selection change syncs viewport selection, but does not rebuild preview
+[✓] 08.17 Auto-refresh when cached guide/custom object moves
+[✓] 08.18 Silent refresh mode when nothing is selected
+[✓] 08.19 Refresh throttling/debounce via QTimer interval
+[✓] 08.20 Live Sync toggle
+[✓] 08.21 Pause preview updates toggle via Live Sync off
+[✓] 08.22 Debounced guide transform refresh
+[✓] 08.23 Debounced external joint transform refresh
+[~] 08.24 Prevent scriptJob duplication on reload/open
+[ ] 08.25 Add scriptJob/callback cleanup validator
+[ ] 08.26 Add Live Sync interval UI
+[ ] 08.27 Add Live Sync debug event log
+
 
 ##########################################################
 # 09. Curve Plane / Secondary Mode Visualization
@@ -158,13 +255,22 @@
 [✓] 09.03 Average plane normals toggle
 [✓] 09.04 Draw previous-mode normals
 [✓] 09.05 Draw custom-object guide direction
-[ ] 09.06 Draw average curve plane
-[ ] 09.07 Plane visibility toggle
-[ ] 09.08 Curve plane stability warning
-[ ] 09.09 Collinear chain plane warning
-[ ] 09.10 Draw all triplet normals used for averaging
-[ ] 09.11 Draw rejected/degenerate triplet normals differently
-[ ] 09.12 Plane normal direction flip button
+[✓] 09.06 Draw electric-blue curve plane surface
+[✓] 09.07 Plane visibility toggle
+[✓] 09.08 Plane normal facing-side detection
+[✓] 09.09 Plane normal clipping against projected plane polygon
+[✓] 09.10 Plane normal hidden/visible pass drawing
+[✓] 09.11 Plane normal tip follows clipping/visibility
+[ ] 09.12 Curve plane stability warning
+[ ] 09.13 Collinear chain plane warning
+[ ] 09.14 Draw all triplet normals used for averaging
+[ ] 09.15 Draw rejected/degenerate triplet normals differently
+[ ] 09.16 Plane normal direction flip button
+[ ] 09.17 Plane stability score in overlay
+[ ] 09.18 Draw accepted triplet normals
+[ ] 09.19 Draw rejected triplet normals
+[ ] 09.20 Add invalid/weak plane color state
+
 
 ##########################################################
 # 10. Guide / Custom Object
@@ -181,9 +287,21 @@
 [✓] 10.10 Guide label refresh after create/select/delete/pick
 [✓] 10.11 Guide creation updates custom object cache
 [✓] 10.12 Warning when Custom Object mode has no valid guide
-[ ] 10.13 Auto-refresh when guide moves
-[ ] 10.14 One guide per root option later
-[ ] 10.15 Shared guide mode later
+[✓] 10.13 Select guide from JOW viewport
+[✓] 10.14 Guide selected visual state
+[✓] 10.15 Selected guide direction lines draw brighter
+[✓] 10.16 Selected guide clears selected joint
+[✓] 10.17 Selected joint clears selected guide
+[✓] 10.18 Auto-refresh when cached guide/custom object moves
+[ ] 10.19 One guide per root option later
+[ ] 10.20 Shared guide mode later
+[ ] 10.21 Guide distance diagnostics
+[ ] 10.22 Guide too-close-to-joint warning
+[ ] 10.23 Guide too-close marker tint
+[ ] 10.24 Selected guide context in overlay
+[~] 10.25 Custom object cache validation when guide is deleted
+[~] 10.26 Clear selected guide if guide object no longer exists
+
 
 ##########################################################
 # 11. UI / UX Polish
@@ -198,36 +316,70 @@
 [✓] 11.08 Cache log UI
 [✓] 11.09 Warning label area
 [✓] 11.10 Disable combo keyboard focus/type-to-select behavior
-[ ] 11.11 Collapsible sections
-[ ] 11.12 Status bar
-[ ] 11.13 Compact/expanded UI mode
-[ ] 11.14 Tooltips
-[ ] 11.15 Icons
-[ ] 11.16 Keyboard shortcuts
-[ ] 11.17 Debug panel toggle
+[✓] 11.11 Show Plane checkbox
+[✓] 11.12 3D Joints checkbox
+[✓] 11.13 Resizable vertical splitter UI
+[✓] 11.14 Overlay drawer / HUD panel
+[✓] 11.15 Overlay visibility checkbox
+[✓] 11.16 Delta Heatmap checkbox
+[✓] 11.17 Current Axes checkbox
+[✓] 11.18 Preview Axes checkbox
+[✓] 11.19 Orient End Joint checkbox
+[✓] 11.20 Green Set Cache From Selection onboarding cue
+[~] 11.21 Overlay compact vertical diagnostic panel
+[ ] 11.22 Collapsible sections
+[ ] 11.23 Status bar
+[✓] 11.24 Tooltips
+[ ] 11.25 Icons
+[ ] 11.26 Keyboard shortcuts
+[ ] 11.27 Debug panel toggle
+[ ] 11.28 Overlay width / text clipping polish
+[ ] 11.29 Viewport selection mode readout
+[ ] 11.30 Better logger/status separation
+[✓] 11.31 Display and preview toggles moved into cleaner button grid
+[✓] 11.32 Checkboxes replaced with checkable QPushButtons
+[✓] 11.33 UI split into Tool / Cache / Settings panels
+[~] 11.34 Restyle remaining action buttons by semantic role
+[ ] 11.35 Add onboarding hints for first-use flow
+
 
 ##########################################################
 # 12. Diagnostics
 ##########################################################
-[ ] 12.01 Orientation difference calculation
-[ ] 12.02 Orientation diagnostics
-[ ] 12.03 Orientation heatmap
-[ ] 12.04 Flipped-joint detection
-[ ] 12.05 Collinear-chain detection
-[ ] 12.06 Invalid-plane warnings
-[ ] 12.07 Custom object missing warning in UI
-[ ] 12.08 Preview/apply mismatch warning
-[ ] 12.09 Chain branch warning
-[ ] 12.10 Multi-root summary warning
-[ ] 12.11 Suspicious twist detection
-[ ] 12.12 End-joint orientation warning
-[ ] 12.13 Guide too-close-to-joint warning
-[ ] 12.14 Unstable secondary reference warning
+[✓] 12.01 Orientation difference calculation
+[✓] 12.02 Orientation diagnostics in overlay
+[✓] 12.03 Orientation heatmap
+[✓] 12.04 Selected joint delta readout
+[✓] 12.05 Max chain delta readout
+[✓] 12.06 Average chain delta readout
+[✓] 12.07 Orientation delta warning thresholds
+[ ] 12.08 Flipped-joint detection
+[ ] 12.09 Collinear-chain detection
+[ ] 12.10 Invalid-plane warnings
+[ ] 12.11 Custom object missing warning in UI
+[ ] 12.12 Preview/apply mismatch warning
+[ ] 12.13 Chain branch warning
+[ ] 12.14 Multi-root summary warning
+[ ] 12.15 Suspicious twist detection
+[ ] 12.16 End-joint orientation warning
+[ ] 12.17 Guide too-close-to-joint warning
+[ ] 12.18 Unstable secondary reference warning
+[ ] 12.19 Branch-chain detection
+[ ] 12.20 Branch-chain overlay warning
+[ ] 12.21 Branch-chain viewport warning color
+[ ] 12.22 Plane stability score
+[ ] 12.23 Rejected triplet normal diagnostics
+[ ] 12.24 Accepted triplet normal diagnostics
+[ ] 12.25 Preview/apply settings snapshot comparison
+[ ] 12.26 End-joint skipped warning refinement
+[ ] 12.27 Large delta warning per selected joint
+[ ] 12.28 Multi-root orientation summary panel
+
 
 ##########################################################
 # 13. Presets
 ##########################################################
-[ ] 13.01 Finish JOW_core/JOW_presets.py
+[~] 13.01 Basic JOW_core/JOW_presets.py file exists
 [ ] 13.02 Settings to dictionary
 [ ] 13.03 Dictionary to settings
 [ ] 13.04 Save Preset button
@@ -240,6 +392,11 @@
 [ ] 13.11 Preset version field
 [ ] 13.12 Import/export presets
 [ ] 13.13 Preset notes/description field
+[ ] 13.14 Preset refresh list
+[ ] 13.15 Preset invalid JSON warning
+[ ] 13.16 Built-in preset protection
+[ ] 13.17 User preset folder support
+
 
 ##########################################################
 # 14. Built-in Presets
@@ -255,6 +412,10 @@
 [ ] 14.09 Quadruped hind leg preset
 [ ] 14.10 Mechanical chain preset
 [ ] 14.11 Generic FK chain preset
+[ ] 14.12 Mechanical piston/hinge preset
+[ ] 14.13 Reverse-foot helper preset
+[ ] 14.14 Game-export skeleton preset
+
 
 ##########################################################
 # 15. Mirroring
@@ -266,6 +427,10 @@
 [ ] 15.05 L/R side token settings
 [ ] 15.06 Mirrored preview color coding
 [ ] 15.07 Mirror plane / mirror axis settings
+[ ] 15.08 Mirror mismatch warnings
+[ ] 15.09 Side-token preset integration
+[ ] 15.10 Mirror apply safety confirmation
+
 
 ##########################################################
 # 16. Advanced Preview Madness
@@ -277,8 +442,15 @@
 [ ] 16.05 Orientation delta labels
 [ ] 16.06 Temporary skin preview mode
 [ ] 16.07 Before/after orientation comparison
-[ ] 16.08 Ghost current local axes
-[ ] 16.09 Ghost preview local axes
+[✓] 16.08 Ghost current local axes
+[✓] 16.09 Ghost preview local axes
+[~] 16.10 Full-chain delta heatmap legend
+[ ] 16.11 Per-joint delta labels toggle
+[ ] 16.12 Color all joint labels by delta severity
+[ ] 16.13 Twist suspicion bands
+[ ] 16.14 Deformation proxy cleanup
+[ ] 16.15 Before/apply/after comparison mode
+
 
 ##########################################################
 # 17. Export / Utility
@@ -290,6 +462,11 @@
 [ ] 17.05 Debug dump button
 [ ] 17.06 Clean temporary nodes button
 [ ] 17.07 Export preview data as JSON
+[ ] 17.08 Export diagnostics as JSON
+[ ] 17.09 Export cached roots list
+[ ] 17.10 Copy overlay diagnostics to clipboard
+[ ] 17.11 Save viewport snapshot with overlay
+
 
 ##########################################################
 # 18. Polish / Productization
@@ -304,6 +481,12 @@
 [ ] 18.08 Missing dependency warnings
 [ ] 18.09 Internal logger
 [ ] 18.10 Dev mode toggle
+[ ] 18.11 Archive legacy jointOrient.py
+[ ] 18.12 Remove or isolate __pycache__ from dumps
+[ ] 18.13 Release notes template
+[ ] 18.14 User-facing help panel
+[ ] 18.15 Internal diagnostic logger
+
 
 ##########################################################
 # 19. Done Sprint: Stability / Clarity Pass
@@ -317,6 +500,7 @@
 [✓] 19.07 Warning label area
 [✓] 19.08 Duplicated cache helper cleanup
 [✓] 19.09 Removed cached-root warning
+
 
 ##########################################################
 # 20. Done Sprint: Viewport Polish Pass
@@ -332,6 +516,7 @@
 [✓] 20.09 Frame Selected button
 [✓] 20.10 Disable combo-key hijacking behavior
 
+
 ##########################################################
 # 21. Done Sprint: Guide Manager Pass
 ##########################################################
@@ -342,21 +527,330 @@
 [✓] 21.05 Make guide creation update custom object cache automatically
 [✓] 21.06 Add warning when Custom Object mode has no valid guide
 [✓] 21.07 Add current guide label refresh after create/select/delete/pick
-[ ] 21.08 Add guide auto-refresh when moved later
+[✓] 21.08 Add guide picking from viewport
+[✓] 21.09 Add selected guide viewport halo
+[✓] 21.10 Add guide auto-refresh when moved via Live Sync
+
 
 ##########################################################
-# 22. Active Sprint: Spatial Diagnostics Pass
+# 22. Done Sprint: Spatial Viewport / Plane Pass
 ##########################################################
-[ ] 22.01 Replace bounds-centered viewport projection with camera-target projection
-[ ] 22.02 Add real world-space grid
-[ ] 22.03 Add world origin axes/grid emphasis
-[ ] 22.04 Add Orient End Joint toggle
-[ ] 22.05 Add current joint orientation data
-[ ] 22.06 Draw current local axes as ghost axes
-[ ] 22.07 Add Show Current Axes toggle
-[ ] 22.08 Add Show Preview Axes toggle
-[ ] 22.09 Calculate orientation difference per joint
-[ ] 22.10 Add orientation difference readout to overlay
-[ ] 22.11 Add selected joint info overlay
-[ ] 22.12 Add guide picking from viewport
-[ ] 22.13 Add guide movement refresh later
+[✓] 22.01 Replace bounds-centered viewport projection with camera-target projection
+[✓] 22.02 Add projected world-space grid
+[✓] 22.03 Add world origin axes/grid emphasis
+[✓] 22.04 Add drawable architecture for viewport visuals
+[✓] 22.05 Add 3D Joints pyramid drawing
+[✓] 22.06 Add electric-blue curve plane surface
+[✓] 22.07 Add Show Plane toggle
+[✓] 22.08 Add guide picking from viewport
+[✓] 22.09 Add overlay drawer / viewport HUD
+[✓] 22.10 Add plane normal hidden/visible clipping
+[✓] 22.11 Add plane normal tip hidden/visible clipping
+[✓] 22.12 Add Orient End Joint toggle
+[✓] 22.13 Add current joint orientation data
+[✓] 22.14 Draw current local axes as ghost axes
+[✓] 22.15 Add Show Current Axes toggle
+[✓] 22.16 Add Show Preview Axes toggle
+[✓] 22.17 Calculate orientation difference per joint
+[✓] 22.18 Add orientation difference readout to overlay
+[✓] 22.19 Add selected joint info overlay
+[✓] 22.20 Add guide movement refresh via Live Sync
+
+
+##########################################################
+# 23. Done Sprint: Current vs Preview Diagnostics Pass
+##########################################################
+[✓] 23.01 Store current Maya joint matrix in PreviewJoint
+[✓] 23.02 Store current Maya local axes in PreviewJoint
+[✓] 23.03 Draw current axes as dashed ghost axes
+[✓] 23.04 Draw preview axes as solid proposed axes
+[✓] 23.05 Add Current Axes visibility toggle
+[✓] 23.06 Add Preview Axes visibility toggle
+[✓] 23.07 Add orientation delta calculation
+[✓] 23.08 Add selected delta to overlay
+[✓] 23.09 Add max delta to overlay
+[✓] 23.10 Add average delta to overlay
+[✓] 23.11 Add delta severity colors
+[✓] 23.12 Add selected joint delta ring
+[✓] 23.13 Add all-joint delta heatmap toggle
+[✓] 23.14 Add all-joint delta rings
+[✓] 23.15 Add overlay warnings for medium/large deltas
+
+
+##########################################################
+# 24. Done Sprint: Selection / HUD Cleanup Pass
+##########################################################
+[✓] 24.01 Fix viewport_empty_clicked signal signature
+[✓] 24.02 Verify empty-click deselect emits correctly
+[✓] 24.03 Fix overlay checkbox default bug
+[ ] 24.04 Widen overlay or add text clipping/wrapping
+[✓] 24.05 Keep Delta Heatmap near viewport controls intentionally
+[✓] 24.06 Make overlay less noisy when no joint is selected but guide is selected
+[ ] 24.07 Add selected guide index/context to overlay if useful
+[ ] 24.08 Add viewport selection mode summary to overlay
+[~] 24.09 Clean remaining vector truthiness checks
+[ ] 24.10 Remove legacy jointOrient.py or mark as archived
+[ ] 24.11 Re-enable Debug Preview Data button if still wanted
+[✓] 24.12 Add heatmap legend to overlay
+[✓] 24.13 Highlight Set Cache From Selection when cache is empty and a joint is selected
+[✓] 24.14 Reset Set Cache button style after caching selection
+[✓] 24.15 Re-highlight Set Cache button after cache clear if joint selection remains
+[✓] 24.16 Add Maya SelectionChanged scriptJob for cache prompt UI
+[✓] 24.17 Clean up selection scriptJob on window close
+[~] 24.18 Make Set Cache button style reset fail-safe with getattr fallback
+[ ] 24.19 Add overlay width constant/config
+[✓] 24.20 Verify mouseReleaseEvent empty-click path
+[✓] 24.21 Verify pick_viewport_item guide/joint/empty priority
+[~] 24.22 Update TODO.jow to remove stale Immediate Code Notes
+
+
+##########################################################
+# 25. Candidate Sprint: Plane / Chain Stability Diagnostics
+##########################################################
+[ ] 25.01 Detect branch chains
+[ ] 25.02 Warn when root chain contains branches
+[ ] 25.03 Detect collinear curve-plane chains
+[ ] 25.04 Warn when curve plane normal is weak/zero
+[ ] 25.05 Draw rejected triplet normals
+[ ] 25.06 Draw accepted triplet normals
+[ ] 25.07 Add plane stability score to overlay
+[ ] 25.08 Add guide-too-close warning
+[ ] 25.09 Add branch warning before Apply Orientation
+[ ] 25.10 Add branch visualization in viewport
+[ ] 25.11 Add multi-root stability summary
+[ ] 25.12 Add unstable secondary reference warning
+
+
+##########################################################
+# 26. Done Sprint: Guide Movement / Native Transform Refresh
+##########################################################
+[✓] 26.01 Add guide transform-change watcher via Live Sync matrix watcher
+[✓] 26.02 Refresh preview when guide moves in Custom Object mode
+[✓] 26.03 Refresh guide direction lines when guide moves
+[✓] 26.04 Debounce guide movement refresh via QTimer interval
+[✓] 26.05 Avoid refreshing unrelated scene objects
+[✓] 26.06 Stop Live Sync timer on close
+[~] 26.07 Warn if cached guide was deleted
+[~] 26.08 Clear selected guide if missing
+[✓] 26.09 Preserve cache roots during guide movement refresh
+
+
+##########################################################
+# 27. Candidate Sprint: Preset System
+##########################################################
+[ ] 27.01 Finish preset data contract
+[ ] 27.02 Add settings serialization
+[ ] 27.03 Add settings deserialization
+[ ] 27.04 Add Save Preset UI
+[ ] 27.05 Add Load Preset UI
+[ ] 27.06 Add Delete Preset UI
+[ ] 27.07 Add preset dropdown refresh
+[ ] 27.08 Add overwrite confirmation
+[ ] 27.09 Add preset validation warnings
+[ ] 27.10 Add built-in preset loading
+[ ] 27.11 Add user preset import/export
+
+
+##########################################################
+# 28. Candidate Sprint: Product UX / Cleanup
+##########################################################
+[ ] 28.01 Archive legacy jointOrient.py
+[ ] 28.02 Remove stale TODO Immediate Code Notes
+[ ] 28.03 Add About dialog
+[ ] 28.04 Add version constant
+[ ] 28.05 Add changelog section
+[ ] 28.06 Add internal logger
+[ ] 28.07 Add dev mode toggle
+[ ] 28.08 Add debug dump button
+[ ] 28.09 Add compact/expanded UI mode
+[ ] 28.10 Add tooltips across primary UI controls
+
+
+##########################################################
+# 29. Done Sprint: UI Panel Refactor
+##########################################################
+[✓] 29.01 Create JOW_ui/JOW_widgets package
+[✓] 29.02 Add JOW_widget_utils.py
+[✓] 29.03 Move toggle/action button styling into JOW_widget_utils.py
+[✓] 29.04 Add checkable QPushButton toggle system
+[✓] 29.05 Create JOWToolPanel
+[✓] 29.06 Move Primary Axis / Secondary Axis / Secondary Mode into JOWToolPanel
+[✓] 29.07 Move Create Guide / Select Guide / Delete Guide / Pick Custom Object into JOWToolPanel
+[✓] 29.08 Create JOWCachePanel
+[✓] 29.09 Move Guide label, cache buttons, and cache root list into JOWCachePanel
+[✓] 29.10 Create JOWSettingsPanel
+[✓] 29.11 Move Overlay / Delta Heat / Live Sync / Projection / Frame buttons into JOWSettingsPanel
+[✓] 29.12 Move Plane Viz / Flip Plane / Avg Normals / Grid Viz / End Joint / Jnt Names / Axis Gizmo into JOWSettingsPanel
+[✓] 29.13 Move 3D Joints / Current Axes / Preview Axes / Axis Length / Joint Size / Normal Length into JOWSettingsPanel
+[✓] 29.14 Use panel-level Qt signals instead of direct widget aliases
+[✓] 29.15 Remove old inline UI construction from JOWWindow
+[✓] 29.16 Keep JOWWindow as orchestration owner
+[✓] 29.17 Fix bool/int signal argument goblins using emit wrapper methods
+[✓] 29.18 Restore display option toggles after panel refactor
+[✓] 29.19 Restore spinbox size updates after panel refactor
+[✓] 29.20 Restore Remove Selected enabled state after panel refactor
+[~] 29.21 Add JOWActionBar scaffold
+[ ] 29.22 Move Apply Orientation / future preset controls into JOWActionBar
+
+
+##########################################################
+# 30. Done Sprint: Native Viewport Sync
+##########################################################
+[✓] 30.01 Add Maya SelectionChanged scriptJob
+[✓] 30.02 Sync native Maya joint selection into JOW viewport
+[✓] 30.03 Sync native Maya guide/custom-object selection into JOW viewport
+[✓] 30.04 Clear JOW viewport selection when Maya selection is cleared
+[✓] 30.05 Preserve cache during selection sync
+[✓] 30.06 Add Live Sync toggle
+[✓] 30.07 Add QTimer matrix watcher
+[✓] 30.08 Watch cached joint world matrices
+[✓] 30.09 Watch cached guide/custom-object world matrix
+[✓] 30.10 Refresh preview when cached joint transforms change
+[✓] 30.11 Refresh preview when cached guide/custom object moves
+[✓] 30.12 Preserve cache during Live Sync refresh
+[✓] 30.13 Stop Live Sync timer on close
+[~] 30.14 Prevent scriptJob duplication on reload/open
+[ ] 30.15 Add Live Sync interval control
+[ ] 30.16 Add debug/log toggle for Live Sync events
+
+
+##########################################################
+# 31. Active Sprint: Cache List / Native Display Tools
+##########################################################
+[✓] 31.01 Replace passive cache QTextEdit with QListWidget
+[✓] 31.02 Show one cached root per row
+[✓] 31.03 Store cached root path in Qt UserRole
+[✓] 31.04 Preserve selected cached rows when cache display refreshes
+[✓] 31.05 Add Add Selection button
+[✓] 31.06 Add Remove Selected button
+[✓] 31.07 Remove Selected emits selected cached root list
+[✓] 31.08 Enable Remove Selected only when cached root row is selected
+[✓] 31.09 Add cached root double-click selection
+[✓] 31.10 Keep Set Cache From Selection as replace-cache behavior
+[✓] 31.11 Keep Add Selection as append-cache behavior
+[✓] 31.12 Add Maya LRA toggle button
+[✓] 31.13 Toggle native Maya displayLocalAxis on cached joints only
+[~] 31.14 Reapply Maya LRA state after cache replacement
+[~] 31.15 Reapply Maya LRA state after adding roots
+[~] 31.16 Hide Maya LRA on removed cached roots
+[~] 31.17 Hide Maya LRA on clear cache
+[ ] 31.18 Decide whether closing JOW should restore/hide tool-managed Maya LRA
+[ ] 31.19 Add cached guide remove button
+[ ] 31.20 Add cache context menu
+[ ] 31.21 Consider switching QListWidget to QTreeWidget / proto-outliner
+
+
+##########################################################
+# 32. Active Sprint Candidate: Chain Safety Diagnostics
+##########################################################
+[ ] 32.01 Detect joints with more than one child joint
+[ ] 32.02 Detect root chains that contain branches
+[ ] 32.03 Add branch count per cached root
+[ ] 32.04 Add branch joint list per cached root
+[ ] 32.05 Warn when get_chain_joints() would flatten a branched hierarchy
+[ ] 32.06 Show branch warning in overlay
+[ ] 32.07 Show branch warning in logger/status area
+[ ] 32.08 Tint branch joints in viewport
+[ ] 32.09 Add Apply Orientation preflight warning for branched chains
+[ ] 32.10 Add option: allow branched apply anyway
+[ ] 32.11 Add option: only orient first-child linear chain
+[ ] 32.12 Add option: process leaf chains separately later
+[ ] 32.13 Detect collinear curve-plane chains
+[ ] 32.14 Warn when curve-plane normal is weak/zero
+[ ] 32.15 Add plane stability score to overlay
+
+
+##########################################################
+# Current Immediate Code Notes
+##########################################################
+[✓] viewport_empty_clicked is QtCore.Signal().
+[✓] Empty-click deselect is wired through pick_viewport_item() and emits viewport_empty_clicked.
+[✓] show_overlay / Delta Heat toggle bug is fixed by panel refactor.
+[✓] Plane size empty-list check is fixed.
+[~] Vector truthiness cleanup is partially done.
+[!] Remaining visible examples:
+    - if not joint.position:
+    - if not chain.guide:
+    - if not normal:
+    - if not bounds:
+    - if not corners:
+[!] Overlay width is still 150 and should become 240-260 or use clipping.
+[✓] Overlay no longer reports "No selected joint" when guide is selected.
+[✓] Heatmap legend exists in overlay when Delta Heatmap is enabled.
+[✓] Set Cache button has prompt style.
+[~] Set Cache prompt reset should still use getattr fallback for extra safety.
+[✓] UI panel refactor completed without aliases.
+[✓] Settings panel bool/int signal wrapper issue fixed.
+[✓] Cache panel Remove Selected enabled-state issue fixed.
+[~] Maya LRA toggle exists, but cache-change reapply/cleanup should be finished.
+[!] Legacy jointOrient.py still exists and should be archived or explicitly marked legacy.
+
+
+##########################################################
+# Summary
+##########################################################
+JOW has moved from a joint-orient script into a modular diagnostic workbench.
+
+Major completed systems:
+1. Modular architecture:
+   - JOW_core
+   - JOW_data
+   - JOW_math
+   - JOW_preview
+   - JOW_guides
+   - JOW_viewport
+   - drawable modules
+   - widget panels
+
+2. Refactored UI:
+   - JOWToolPanel
+   - JOWCachePanel
+   - JOWSettingsPanel
+   - checkable QPushButton toggle UI
+   - shared widget utilities
+
+3. Viewport:
+   - custom 2.5D diagnostic viewport
+   - projections: Orbit / XY / XZ / ZY
+   - grid
+   - axis gizmo
+   - guide picking
+   - joint picking
+   - delta heatmap
+   - current axes
+   - preview axes
+   - frame preview / frame selected with orbit target
+
+4. Cache workflow:
+   - Set Cache From Selection replaces cache
+   - Add Selection appends roots
+   - Remove Selected removes selected cached roots
+   - double-click cached root selects it in Maya
+   - cache button prompt turns green when cache is empty and a joint is selected
+
+5. Live Sync:
+   - Maya selection sync
+   - QTimer matrix watcher
+   - cached joint transform refresh
+   - cached guide/custom object transform refresh
+   - cache-preserving refresh
+
+6. Diagnostics:
+   - current-vs-preview orientation delta
+   - selected/max/average delta overlay
+   - severity colors
+   - delta rings
+   - heatmap rings
+   - overlay warnings
+
+7. Native Maya display tools:
+   - Maya LRA button added
+   - displayLocalAxis toggled for cached joints only
+
+Desired next order:
+1. Finish Maya LRA lifecycle cleanup.
+2. Widen / clean overlay.
+3. Finish vector truthiness cleanup.
+4. Add branch-chain detection and warnings.
+5. Add collinear / unstable plane diagnostics.
+6. Start presets.

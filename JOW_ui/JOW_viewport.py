@@ -12,8 +12,17 @@ except ImportError:
 
 import math as py_math
 
+from JOW_ui.JOW_drawables.JOW_grid_drawer import JOWGridDrawer
+from JOW_ui.JOW_drawables.JOW_axis_drawer import JOWAxisDrawer
+from JOW_ui.JOW_drawables.JOW_joint_drawer import JOWJointDrawer
+from JOW_ui.JOW_drawables.JOW_guide_drawer import JOWGuideDrawer
+from JOW_ui.JOW_drawables.JOW_plane_drawer import JOWPlaneDrawer
+from JOW_ui.JOW_drawables.JOW_overlay_drawer import JOWOverlayDrawer
+
 class JOWViewport(QtWidgets.QFrame):
     joint_clicked = QtCore.Signal(str)
+    guide_clicked = QtCore.Signal(str)
+    viewport_empty_clicked = QtCore.Signal()
 
     def __init__(self, parent=None):
         super(JOWViewport, self).__init__(parent)
@@ -26,32 +35,58 @@ class JOWViewport(QtWidgets.QFrame):
 
         self.last_mouse_pos = None
         self.mouse_press_pos = None
-        self.projection_mode = "XY"
+        self.projection_mode = "Orbit"
 
         self.show_grid = True
         self.show_axis_gizmo = True
+        self.show_3d_joints = False
+        self.show_overlay = True
+        self.show_delta_heatmap = False
+        
+        self.show_current_axes = True
+        self.show_preview_axes = True   
+
+        self.show_curve_plane_surface = True
+        self.orient_end_joint = True
+        self.apply_target_label = "Cached/Selection"
 
         self.axis_length = 28
         self.joint_size = 5
         self.selected_joint_size = 8
         self.normal_length = 60
 
+        self.selected_guide = None
+
         self.selected_joint = None
         self.click_threshold = 6
         self.pick_threshold = 14
 
         self.secondary_mode = "World"
+        self.primary_axis = "X"
+        self.secondary_axis = "Y"
+        self.flip_plane = False
+        self.average_normals = True
+        self.orient_end_joint = True
+        self.apply_target_label = "Cached Chain"
 
         self.show_joint_names = False
 
         self.orbit_yaw = 0.0
         self.orbit_pitch = 0.0
         self.orbit_sensitivity = 0.01
+        self.orbit_target = self.vector_from_components(0.0,0.0,0.0)
 
         self.setMouseTracking(True)
         self.setFocusPolicy(QtCore.Qt.StrongFocus)
 
         self.preview_chains = []
+
+        self.grid_drawer = JOWGridDrawer(self)
+        self.axis_drawer = JOWAxisDrawer(self)
+        self.joint_drawer = JOWJointDrawer(self)
+        self.guide_drawer = JOWGuideDrawer(self)
+        self.plane_drawer = JOWPlaneDrawer(self)
+        self.overlay_drawer = JOWOverlayDrawer(self)
 
         self.setMinimumHeight(360)
         self.setFrameShape(QtWidgets.QFrame.StyledPanel)
@@ -77,7 +112,6 @@ class JOWViewport(QtWidgets.QFrame):
         if preview_chains and not had_chains:
             self.frame_preview()
             return
-
         self.update()
     def set_show_joint_names(self, state):
         self.show_joint_names = state
@@ -96,11 +130,58 @@ class JOWViewport(QtWidgets.QFrame):
         self.update()
     def set_joint_size(self, value):
         self.joint_size = value
-        self.selected_joint_size = value + 3
+        self.selected_joint_size = value + 5
         self.update()
     def set_normal_length(self, value):
         self.normal_length = value
         self.update()
+    def set_show_3d_joints(self, state):
+        self.show_3d_joints = state
+        self.update()
+    def set_show_curve_plane_surface(self, state):
+        self.show_curve_plane_surface = state
+        self.update()
+    def set_apply_target_label(self, label):
+        self.apply_target_label = label
+        self.update()
+    def set_overlay_context(self, settings, apply_target_label):
+        self.primary_axis = settings.primary_axis
+        self.secondary_axis = settings.secondary_axis
+        self.flip_plane = settings.flip_plane
+        self.average_normals = settings.average_normals
+        self.orient_end_joint = getattr(
+            settings,
+            "orient_end_joint",
+            True
+        )
+        self.apply_target_label = apply_target_label
+        self.update()
+    def set_show_current_axes(self, state):
+        self.show_current_axes = state
+        self.update()
+    def set_show_preview_axes(self, state):
+        self.show_preview_axes = state
+        self.update()
+    def set_show_overlay(self, state):
+        self.show_overlay = state
+        self.update()
+    def set_show_delta_heatmap(self, state):
+        self.show_delta_heatmap = state
+        self.update()
+    def set_selected_guide(self, guide_name):
+        self.selected_guide = guide_name
+        self.update()
+    def set_orbit_target(self, point):
+        if point is None:
+            self.orbit_target = self.vector_from_components(0.0,0.0,0.0)
+            return
+
+        self.orbit_target = self.vector_from_components(
+            point.x,
+            point.y,
+            point.z
+        )
+
 
     def paintEvent(self, event):
         super(JOWViewport, self).paintEvent(event)
@@ -110,12 +191,13 @@ class JOWViewport(QtWidgets.QFrame):
 
         rect = self.rect()
 
-        self.draw_grid(painter, rect)
+        self.grid_drawer.draw_grid(painter, rect)
 
         if not self.preview_chains:
             self.draw_empty_state(painter, rect)
-            self.draw_axis_gizmo(painter, rect)
-            self.draw_overlay(painter, rect)
+            self.axis_drawer.draw_axis_gizmo(painter, rect)
+            if self.show_overlay:
+                self.overlay_drawer.draw_overlay(painter, rect)
             painter.end()
             return
 
@@ -123,8 +205,9 @@ class JOWViewport(QtWidgets.QFrame):
 
         if not points:
             self.draw_empty_state(painter, rect)
-            self.draw_axis_gizmo(painter, rect)
-            self.draw_overlay(painter, rect)
+            self.axis_drawer.draw_axis_gizmo(painter, rect)
+            if self.show_overlay:
+                self.overlay_drawer.draw_overlay(painter, rect)
             painter.end()
             return
 
@@ -134,8 +217,9 @@ class JOWViewport(QtWidgets.QFrame):
         for chain in self.preview_chains:
             self.draw_chain(painter, chain, bounds, scale, rect)
 
-        self.draw_axis_gizmo(painter, rect)
-        self.draw_overlay(painter, rect)
+        self.axis_drawer.draw_axis_gizmo(painter, rect)
+        if self.show_overlay:
+            self.overlay_drawer.draw_overlay(painter, rect)
 
         painter.end()
 
@@ -145,7 +229,7 @@ class JOWViewport(QtWidgets.QFrame):
         painter.drawText(
             rect,
             QtCore.Qt.AlignCenter,
-            ":)\n\nViewport Coming Soon\n\nSelect joints and refresh preview"
+            "\n\n\nSelect joints and <Set Cache From Selection> :)"
         )
 
     def collect_points(self):
@@ -153,8 +237,25 @@ class JOWViewport(QtWidgets.QFrame):
 
         for chain in self.preview_chains:
             for joint in chain.joints:
-                if joint.position:
-                    points.append(joint.position)
+                if joint.position is None:
+                    continue
+
+                points.append(joint.position)
+
+        return points
+    
+    def collect_frame_points(self):
+        points = []
+
+        for chain in self.preview_chains:
+            for joint in chain.joints:
+                if joint.position is None:
+                    continue
+
+                points.append(joint.position)
+
+            if chain.guide and chain.guide.position is not None:
+                points.append(chain.guide.position)
 
         return points
 
@@ -173,16 +274,36 @@ class JOWViewport(QtWidgets.QFrame):
             "min_b": min_b,
             "max_b": max_b
         }
-    """
-    def get_scale(self, bounds, rect):
-        width = max(bounds["max_a"] - bounds["min_a"], 0.001)
-        height = max(bounds["max_b"] - bounds["min_b"], 0.001)
 
-        scale_x = (rect.width() * 0.75) / width
-        scale_y = (rect.height() * 0.75) / height
+    def get_world_bounds_center(self, points):
+        if not points:
+            return self.vector_from_components(0.0,0.0,0.0)
 
-        return min(scale_x, scale_y) * self.zoom
-    """
+        min_x = min(point.x for point in points)
+        max_x = max(point.x for point in points)
+
+        min_y = min(point.y for point in points)
+        max_y = max(point.y for point in points)
+
+        min_z = min(point.z for point in points)
+        max_z = max(point.z for point in points)
+
+        return self.vector_from_components(
+            (min_x + max_x) * 0.5,
+            (min_y + max_y) * 0.5,
+            (min_z + max_z) * 0.5
+        )
+
+
+    def rotate_point_around_orbit_target(self, point):
+        offset = self.vector_from_components(
+            point.x - self.orbit_target.x,
+            point.y - self.orbit_target.y,
+            point.z - self.orbit_target.z
+        )
+
+        return self.rotate_vector(offset)
+
     def get_scale(self, bounds, rect):
         return self.view_scale * self.zoom
 
@@ -212,399 +333,20 @@ class JOWViewport(QtWidgets.QFrame):
 
         return a_min, a_max, b_min, b_max
 
-    def get_grid_size(self, scale):
-        if scale <= 0:
-            return 1.0
-
-        target_pixels = 45.0
-        target_world_size = target_pixels / scale
-
-        if target_world_size <= 0:
-            return 1.0
-
-        magnitude = 10 ** py_math.floor(py_math.log10(target_world_size))
-
-        for multiplier in [1, 2, 5, 10]:
-            grid_size = magnitude * multiplier
-
-            if grid_size >= target_world_size:
-                return grid_size
-
-        return magnitude * 10
-
-    def draw_grid(self, painter, rect):
-        if not self.show_grid:
-            return
-
-        scale = self.get_scale(None, rect)
-
-        if scale <= 0:
-            return
-
-        grid_size = self.get_grid_size(scale)
-
-        center_u, center_v = self.get_grid_center_uv()
-
-        visible_world_size = max(
-            rect.width(),
-            rect.height()
-        ) / scale
-
-        extent = max(
-            visible_world_size * 1.5,
-            grid_size * 20
-        )
-
-        min_u = center_u - extent
-        max_u = center_u + extent
-
-        min_v = center_v - extent
-        max_v = center_v + extent
-
-        start_u = py_math.floor(min_u / grid_size) * grid_size
-        start_v = py_math.floor(min_v / grid_size) * grid_size
-
-        painter.setPen(QtGui.QPen(QtGui.QColor(45, 45, 45), 1))
-
-        u = start_u
-
-        while u <= max_u:
-            point_a = self.project_grid_point(u, min_v, rect, scale)
-            point_b = self.project_grid_point(u, max_v, rect, scale)
-
-            painter.drawLine(point_a, point_b)
-
-            u += grid_size
-
-        v = start_v
-
-        while v <= max_v:
-            point_a = self.project_grid_point(min_u, v, rect, scale)
-            point_b = self.project_grid_point(max_u, v, rect, scale)
-
-            painter.drawLine(point_a, point_b)
-
-            v += grid_size
-
-        self.draw_grid_origin_axes(
-            painter,
-            rect,
-            scale,
-            min_u,
-            max_u,
-            min_v,
-            max_v
-        )
-
-    def draw_grid_origin_axes(
-        self,
-        painter,
-        rect,
-        scale,
-        min_u,
-        max_u,
-        min_v,
-        max_v
-    ):
-        grid_plane = self.get_grid_plane()
-
-        if grid_plane == "XY":
-            horizontal_color = QtGui.QColor(255, 80, 80)
-            vertical_color = QtGui.QColor(80, 255, 80)
-
-        elif grid_plane == "XZ":
-            horizontal_color = QtGui.QColor(255, 80, 80)
-            vertical_color = QtGui.QColor(80, 140, 255)
-
-        elif grid_plane == "ZY":
-            horizontal_color = QtGui.QColor(80, 140, 255)
-            vertical_color = QtGui.QColor(80, 255, 80)
-
-        else:
-            horizontal_color = QtGui.QColor(255, 80, 80)
-            vertical_color = QtGui.QColor(80, 140, 255)
-        lineWidth = 1
-        if min_v <= 0 <= max_v:
-            painter.setPen(QtGui.QPen(horizontal_color, lineWidth))
-
-            point_a = self.project_grid_point(min_u, 0, rect, scale)
-            point_b = self.project_grid_point(max_u, 0, rect, scale)
-
-            painter.drawLine(point_a, point_b)
-
-        if min_u <= 0 <= max_u:
-            painter.setPen(QtGui.QPen(vertical_color, lineWidth))
-
-            point_a = self.project_grid_point(0, min_v, rect, scale)
-            point_b = self.project_grid_point(0, max_v, rect, scale)
-
-            painter.drawLine(point_a, point_b)
-
-    def draw_axis_gizmo(self, painter, rect):
-        if not self.show_axis_gizmo:
-            return
-
-        origin = QtCore.QPointF(
-            rect.right() - 70,
-            rect.bottom() - 55
-        )
-
-        length = 32
-
-        axes = [
-            ("X", self.vector_from_components(1, 0, 0), QtGui.QColor(255, 80, 80)),
-            ("Y", self.vector_from_components(0, 1, 0), QtGui.QColor(80, 255, 80)),
-            ("Z", self.vector_from_components(0, 0, 1), QtGui.QColor(80, 140, 255))
-        ]
-
-        for label, axis, color in axes:
-            axis_a, axis_b = self.project_gizmo_axis(axis, label)
-
-            end = QtCore.QPointF(
-                origin.x() + axis_a * length,
-                origin.y() - axis_b * length
-            )
-
-            painter.setPen(QtGui.QPen(color, 2))
-            painter.drawLine(origin, end)
-
-            painter.setPen(color)
-            painter.drawText(
-                end + QtCore.QPointF(4, -4),
-                label
-            )
-
-        painter.setPen(QtGui.QPen(QtGui.QColor(220, 220, 220), 1))
-        painter.setBrush(QtGui.QBrush(QtGui.QColor(220, 220, 220)))
-        painter.drawEllipse(origin, 3, 3)
-
     def draw_chain(self, painter, chain, bounds, scale, rect):
-        self.draw_bones(painter, chain, bounds, scale, rect)
-        self.draw_axes(painter, chain, bounds, scale, rect)
-        self.draw_curve_plane_normal(painter, chain, bounds, scale, rect)
-        self.draw_previous_normals(painter, chain, bounds, scale, rect)
-        self.draw_custom_object_lines(painter, chain, bounds, scale, rect)
-        self.draw_custom_object_marker(painter, chain, bounds, scale, rect)
-        self.draw_joints(painter, chain, bounds, scale, rect)
-        self.draw_joint_names(painter, chain, bounds, scale, rect)
+        self.plane_drawer.draw_curve_plane_normal_hidden(painter, chain, bounds, scale, rect)
+        self.plane_drawer.draw_curve_plane_surface(painter, chain, bounds, scale, rect)
+        self.joint_drawer.draw_bones(painter, chain, bounds, scale, rect)
+        self.axis_drawer.draw_axes(painter, chain, bounds, scale, rect)
 
-    def draw_bones(self, painter, chain, bounds, scale, rect):
-        painter.setPen(QtGui.QPen(QtGui.QColor(220, 220, 220), 2))
+        self.plane_drawer.draw_previous_normals(painter, chain, bounds, scale, rect)
 
-        for i in range(len(chain.joints) - 1):
-            a = chain.joints[i]
-            b = chain.joints[i + 1]
+        self.guide_drawer.draw_custom_object_lines(painter, chain, bounds, scale, rect)
+        self.guide_drawer.draw_custom_object_marker(painter, chain, bounds, scale, rect)
 
-            point_a = self.project_point(a.position, bounds, scale, rect)
-            point_b = self.project_point(b.position, bounds, scale, rect)
-
-            painter.drawLine(point_a, point_b)
-
-    def draw_joints(self, painter, chain, bounds, scale, rect):
-        for joint in chain.joints:
-            point = self.project_point(joint.position, bounds, scale, rect)
-
-            if joint.name == self.selected_joint:
-                painter.setPen(QtGui.QPen(QtGui.QColor(255, 255, 255), 2))
-                painter.setBrush(QtGui.QBrush(QtGui.QColor(255, 90, 40)))
-                painter.drawEllipse(point, self.selected_joint_size, self.selected_joint_size)
-            else:
-                painter.setPen(QtGui.QPen(QtGui.QColor(255, 255, 255), 1))
-                painter.setBrush(QtGui.QBrush(QtGui.QColor(255, 210, 80)))
-                painter.drawEllipse(point, self.joint_size, self.joint_size)
-
-    def draw_axes(self, painter, chain, bounds, scale, rect):
-        for joint in chain.joints:
-            origin = self.project_point(joint.position, bounds, scale, rect)
-
-            show_labels = (joint.name == self.selected_joint)
-
-            self.draw_axis(
-                painter,
-                origin,
-                joint.x_axis,
-                self.axis_length,
-                QtGui.QColor(255, 80, 80),
-                "X" if show_labels else None
-            )
-
-            self.draw_axis(
-                painter,
-                origin,
-                joint.y_axis,
-                self.axis_length,
-                QtGui.QColor(80, 255, 80),
-                "Y" if show_labels else None
-            )
-
-            self.draw_axis(
-                painter,
-                origin,
-                joint.z_axis,
-                self.axis_length,
-                QtGui.QColor(80, 140, 255),
-                "Z" if show_labels else None
-            )
-
-    def draw_axis(self, painter, origin, axis, length, color, label=None):
-        if not axis:
-            return
-
-        axis_a, axis_b = self.project_axis(axis)
-
-        painter.setPen(QtGui.QPen(color, 2))
-
-        end = QtCore.QPointF(
-            origin.x() + axis_a * length,
-            origin.y() - axis_b * length
-        )
-
-        painter.drawLine(origin, end)
-
-        if label:
-            painter.setPen(color)
-            painter.drawText(
-                end + QtCore.QPointF(4, -4),
-                label
-            )
-
-    def draw_curve_plane_normal(self, painter, chain, bounds, scale, rect):
-        if self.secondary_mode != "Curve Plane":
-            return
-
-        if not chain.curve_plane_center:
-            return
-
-        if not chain.curve_plane_normal:
-            return
-
-        origin = self.project_point(chain.curve_plane_center, bounds, scale, rect)
-
-        axis_a, axis_b = self.project_axis(chain.curve_plane_normal)
-
-        length = self.normal_length
-
-        end = QtCore.QPointF(
-            origin.x() + axis_a * length,
-            origin.y() - axis_b * length
-        )
-
-        painter.setPen(QtGui.QPen(QtGui.QColor(255, 230, 80), 3))
-        painter.drawLine(origin, end)
-
-        painter.setBrush(QtGui.QBrush(QtGui.QColor(255, 230, 80)))
-        painter.drawEllipse(end, 4, 4)
-
-    def draw_overlay(self, painter, rect):
-        painter.setPen(QtGui.QColor(200, 200, 200))
-
-        scale = self.get_scale(None, rect)
-        grid_size = self.get_grid_size(scale)
-
-        text = "Projection: {}   Mode: {}   Chains: {}   Grid: {}".format(
-            self.projection_mode,
-            self.secondary_mode,
-            len(self.preview_chains),
-            round(grid_size, 3)
-        )
-
-        painter.drawText(
-            rect.adjusted(10, 10, -10, -10),
-            QtCore.Qt.AlignTop | QtCore.Qt.AlignLeft,
-            text
-        )
-
-    def draw_previous_normals(self, painter, chain, bounds, scale, rect):
-        if self.secondary_mode != "Previous":
-            return
-
-        painter.setPen(QtGui.QPen(QtGui.QColor(255, 180, 60), 2))
-
-        length = self.normal_length
-
-        for previous_normal in chain.previous_normals:
-            if not previous_normal.position:
-                continue
-
-            if not previous_normal.normal:
-                continue
-
-            origin = self.project_point(previous_normal.position, bounds, scale, rect)
-
-            axis_a, axis_b = self.project_axis(previous_normal.normal)
-
-            end = QtCore.QPointF(
-                origin.x() + axis_a * length,
-                origin.y() - axis_b * length
-            )
-
-            painter.drawLine(origin, end)
-
-            painter.setBrush(QtGui.QBrush(QtGui.QColor(255, 180, 60)))
-            painter.drawEllipse(end, 3, 3)
-
-    def draw_custom_object_marker(self, painter, chain, bounds, scale, rect):
-        if self.secondary_mode != "Custom Object":
-            return
-
-        if not chain.guide:
-            return
-
-        if not chain.guide.position:
-            return
-
-        point = self.project_point(chain.guide.position, bounds, scale, rect)
-
-        painter.setPen(QtGui.QPen(QtGui.QColor(230, 160, 255), 2))
-        painter.setBrush(QtGui.QBrush(QtGui.QColor(130, 60, 180)))
-
-        painter.drawEllipse(point, 7, 7)
-
-        if chain.guide.name:
-            painter.drawText(
-                point + QtCore.QPointF(10, -10),
-                chain.guide.name.split("|")[-1]
-            )
-
-    def draw_custom_object_lines(self, painter, chain, bounds, scale, rect):
-        if self.secondary_mode != "Custom Object":
-            return
-
-        if not chain.guide:
-            return
-
-        if not chain.guide.position:
-            return
-
-        guide_point = self.project_point(chain.guide.position, bounds, scale, rect)
-
-        painter.setPen(QtGui.QPen(QtGui.QColor(200, 120, 255), 1, QtCore.Qt.DashLine))
-
-        for joint in chain.joints:
-            if not joint.position:
-                continue
-
-            joint_point = self.project_point(joint.position, bounds, scale, rect)
-
-            painter.drawLine(joint_point, guide_point)
-
-    def draw_joint_names(self, painter, chain, bounds, scale, rect):
-        if not self.show_joint_names:
-            return
-
-        painter.setPen(QtGui.QColor(220, 220, 220))
-
-        for joint in chain.joints:
-            if not joint.position:
-                continue
-
-            point = self.project_point(joint.position, bounds, scale, rect)
-
-            painter.drawText(
-                point + QtCore.QPointF(8, -8),
-                joint.name.split("|")[-1]
-            )
-
+        self.joint_drawer.draw_joints(painter, chain, bounds, scale, rect)
+        self.joint_drawer.draw_joint_names(painter, chain, bounds, scale, rect)
+        self.plane_drawer.draw_curve_plane_normal_visible(painter, chain, bounds, scale, rect)
 
     ##########################################################
     # Projections / Vector transforms
@@ -632,83 +374,9 @@ class JOWViewport(QtWidgets.QFrame):
 
         return rotated_x, final_y, final_z
 
-
     def get_orbit_values(self, point):
-        x, y, z = self.rotate_vector(point)
+        x, y, z = self.rotate_point_around_orbit_target(point)
         return x, y
-
-    def get_grid_plane(self):
-        if self.projection_mode == "XY":
-            return "XY"
-
-        if self.projection_mode == "XZ":
-            return "XZ"
-
-        if self.projection_mode == "ZY":
-            return "ZY"
-
-        if self.projection_mode == "Orbit":
-            return "XZ"
-
-        return "XZ"
-
-
-    def make_grid_point(self, u, v):
-        grid_plane = self.get_grid_plane()
-
-        if grid_plane == "XY":
-            return self.vector_from_components(u, v, 0)
-
-        if grid_plane == "XZ":
-            return self.vector_from_components(u, 0, v)
-
-        if grid_plane == "ZY":
-            return self.vector_from_components(0, v, u)
-
-        return self.vector_from_components(u, 0, v)
-
-
-    def get_grid_center_uv(self):
-        points = self.collect_points()
-
-        if not points:
-            return 0.0, 0.0
-
-        grid_plane = self.get_grid_plane()
-
-        if grid_plane == "XY":
-            values = [(p.x, p.y) for p in points]
-
-        elif grid_plane == "XZ":
-            values = [(p.x, p.z) for p in points]
-
-        elif grid_plane == "ZY":
-            values = [(p.z, p.y) for p in points]
-
-        else:
-            values = [(p.x, p.z) for p in points]
-
-        min_u = min(v[0] for v in values)
-        max_u = max(v[0] for v in values)
-
-        min_v = min(v[1] for v in values)
-        max_v = max(v[1] for v in values)
-
-        center_u = (min_u + max_u) * 0.5
-        center_v = (min_v + max_v) * 0.5
-
-        return center_u, center_v
-
-
-    def project_grid_point(self, u, v, rect, scale):
-        point = self.make_grid_point(u, v)
-
-        return self.project_point(
-            point,
-            None,
-            scale,
-            rect
-        )
 
     def get_projected_values(self, point):
         if self.projection_mode == "XY":
@@ -741,19 +409,14 @@ class JOWViewport(QtWidgets.QFrame):
 
         return axis.x, axis.y
 
-    def project_gizmo_axis(self, axis, label):
-        axis_a, axis_b = self.project_axis(axis)
-
-        if self.projection_mode == "ZY" and label == "Z":
-            axis_a *= -1
-
-        return axis_a, axis_b
-
     def frame_preview(self):
-        points = self.collect_points()
+        points = self.collect_frame_points()
 
         if not points:
             return
+
+        focus_point = self.get_world_bounds_center(points)
+        self.set_orbit_target(focus_point)
 
         rect = self.rect()
         bounds = self.get_bounds(points)
@@ -761,43 +424,66 @@ class JOWViewport(QtWidgets.QFrame):
         width = max(bounds["max_a"] - bounds["min_a"], 0.001)
         height = max(bounds["max_b"] - bounds["min_b"], 0.001)
 
-        self.view_center_a = (bounds["min_a"] + bounds["max_a"]) * 0.5
-        self.view_center_b = (bounds["min_b"] + bounds["max_b"]) * 0.5
-
         scale_x = (rect.width() * 0.75) / width
         scale_y = (rect.height() * 0.75) / height
 
         self.view_scale = min(scale_x, scale_y)
 
+        if self.projection_mode == "Orbit":
+            self.view_center_a = 0.0
+            self.view_center_b = 0.0
+        else:
+            self.view_center_a = (bounds["min_a"] + bounds["max_a"]) * 0.5
+            self.view_center_b = (bounds["min_b"] + bounds["max_b"]) * 0.5
+
         self.zoom = 1.0
-        self.pan = QtCore.QPointF(0, 0)
+        self.pan = QtCore.QPointF(0,0)
 
         self.update()
 
     def frame_selected_joint(self):
-        if not self.selected_joint:
+        selected_point = self.get_selected_focus_point()
+        if selected_point is None:
             return
 
-        bounds, scale, rect = self.get_current_view_data()
+        self.set_orbit_target(selected_point)
+        a, b = self.get_projected_values(selected_point)
 
-        if not rect:
-            return
+        if self.projection_mode == "Orbit":
+            self.view_center_a = 0.0
+            self.view_center_b = 0.0
+        else:
+            self.view_center_a = a
+            self.view_center_b = b
 
-        for chain in self.preview_chains:
-            for joint in chain.joints:
-                if joint.name != self.selected_joint:
+        self.pan = QtCore.QPointF(0, 0)
+        self.update()
+    def get_selected_focus_point(self):
+        if self.selected_joint:
+            for chain in self.preview_chains:
+                for joint in chain.joints:
+                    if joint.name != self.selected_joint:
+                        continue
+
+                    if joint.position is None:
+                        return None
+
+                    return joint.position
+
+        if self.selected_guide:
+            for chain in self.preview_chains:
+                if not chain.guide:
                     continue
 
-                a, b = self.get_projected_values(joint.position)
+                if chain.guide.name != self.selected_guide:
+                    continue
 
-                self.view_center_a = a
-                self.view_center_b = b
+                if chain.guide.position is None:
+                    return None
 
-                self.pan = QtCore.QPointF(0, 0)
+                return chain.guide.position
 
-                self.update()
-                return
-
+        return None
 
     ##########################################################
     # Viewport Control
@@ -814,6 +500,8 @@ class JOWViewport(QtWidgets.QFrame):
 
         self.view_center_a = 0.0
         self.view_center_b = 0.0
+
+        self.set_orbit_target(self.vector_from_components(0.0, 0.0, 0.0))
 
         self.orbit_yaw = 0.0
         self.orbit_pitch = 0.0
@@ -833,45 +521,30 @@ class JOWViewport(QtWidgets.QFrame):
         return bounds, scale, rect
 
 
-    def find_joint_at_screen_pos(self, screen_pos):
-        bounds, scale, rect = self.get_current_view_data()
+    def pick_viewport_item(self, screen_pos):
+        guide_name = self.guide_drawer.pick_guide(screen_pos)
+        if guide_name:
+            self.set_selected_guide(guide_name)
+            self.set_selected_joint(None)
+            self.guide_clicked.emit(guide_name)
 
-        if not bounds:
-            return None
-
-        closest_joint = None
-        closest_distance = None
-
-        for chain in self.preview_chains:
-            for joint in chain.joints:
-                if not joint.position:
-                    continue
-
-                point = self.project_point(joint.position, bounds, scale, rect)
-
-                delta_x = point.x() - screen_pos.x()
-                delta_y = point.y() - screen_pos.y()
-
-                distance = (delta_x ** 2 + delta_y ** 2) ** 0.5
-
-                if closest_distance is None or distance < closest_distance:
-                    closest_distance = distance
-                    closest_joint = joint
-
-        if closest_distance is not None and closest_distance <= self.pick_threshold:
-            return closest_joint
-
-        return None
-
-
-    def pick_joint(self, screen_pos):
-        joint = self.find_joint_at_screen_pos(screen_pos)
-
-        if not joint:
             return
 
-        self.set_selected_joint(joint.name)
-        self.joint_clicked.emit(joint.name)
+        joint_name = self.joint_drawer.pick_joint(screen_pos)
+        if joint_name:
+            self.set_selected_joint(joint_name)
+            self.set_selected_guide(None)
+            self.joint_clicked.emit(joint_name)
+
+            return
+
+        self.clear_viewport_selection()
+        self.viewport_empty_clicked.emit()
+
+    def clear_viewport_selection(self):
+        self.set_selected_joint(None)
+        self.set_selected_guide(None)
+        self.update()
 
     ##########################################################
     # Mouse Events
@@ -928,7 +601,7 @@ class JOWViewport(QtWidgets.QFrame):
                 distance = (delta.x() ** 2 + delta.y() ** 2) ** 0.5
 
                 if distance <= self.click_threshold:
-                    self.pick_joint(event.pos())
+                    self.pick_viewport_item(event.pos())
 
             self.last_mouse_pos = None
             self.mouse_press_pos = None

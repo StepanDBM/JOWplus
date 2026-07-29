@@ -17,576 +17,510 @@ from JOW_ui.JOW_gl import JOW_guides
 from JOW_ui.JOW_gl import JOW_preview
 from JOW_core.JOW_data import OrientationSettings
 
+from JOW_ui.JOW_widgets.JOW_tool_panel import JOWToolPanel
+from JOW_ui.JOW_widgets.JOW_cache_panel import JOWCachePanel
+from JOW_ui.JOW_widgets.JOW_settings_panel import JOWSettingsPanel
+from JOW_ui.JOW_widgets.JOW_widget_utils import create_action_button
+
+
 WINDOW_NAME = "JOW_bySDBM"
+
 
 def maya_main_window():
     ptr = OpenMayaUI.MQtUtil.mainWindow()
+
     return wrapInstance(
         int(ptr),
         QtWidgets.QWidget
     )
 
+
 class JOWWindow(QtWidgets.QDialog):
 
-    AXES = ["X", "Y", "Z"]
     def __init__(self, parent=maya_main_window()):
         super(JOWWindow, self).__init__(parent)
-        self.setWindowTitle("JOW : Joint Orient Workbench by SDBM")
 
+        self.setWindowTitle("JOW : Joint Orient Workbench by SDBM")
         self.resize(780, 900)
         self.setMinimumSize(520, 520)
         self.setSizeGripEnabled(True)
-    
-        self._updating_axis_combos = False
+
+        self.selection_script_job = None
+
+        self.live_sync_timer = None
+        self.live_sync_snapshot = {}
+        self.live_sync_interval_ms = 50
+        self.live_sync_tolerance = 0.00001
+        self._live_sync_refreshing = False
+
+        self.native_rotation_axis_nodes = set()
+
+        self._syncing_selection_from_viewport = False
 
         self.build_ui()
+        self.connect_signals()
+
+        self.create_selection_script_job()
+        self.create_live_sync_timer()
+
+        self.refresh_cache_panel()
+        self.update_viewport_display_options()
+        self.update_viewport_sizes()
+
+    ##########################################################
+    # Build UI
+    ##########################################################
 
     def build_ui(self):
         margins = 4
+
         main_layout = QtWidgets.QVBoxLayout(self)
-        main_layout.setContentsMargins(margins, margins, margins,margins)
+        main_layout.setContentsMargins(
+            margins,
+            margins,
+            margins,
+            margins
+        )
 
         self.main_splitter = QtWidgets.QSplitter(QtCore.Qt.Vertical)
 
         self.controls_widget = QtWidgets.QWidget()
-        layout = QtWidgets.QVBoxLayout(self.controls_widget)
-        layout.setContentsMargins(margins, margins, margins,margins)
+        controls_layout = QtWidgets.QVBoxLayout(self.controls_widget)
+        controls_layout.setContentsMargins(
+            margins,
+            margins,
+            margins,
+            margins
+        )
+        controls_layout.setSpacing(4)
 
         self.viewport_widget = QtWidgets.QWidget()
         viewport_layout = QtWidgets.QVBoxLayout(self.viewport_widget)
-        viewport_layout.setContentsMargins(margins, margins, margins,margins)
+        viewport_layout.setContentsMargins(
+            margins,
+            margins,
+            margins,
+            margins
+        )
+        viewport_layout.setSpacing(4)
+
         self.viewport_widget.setSizePolicy(
             QtWidgets.QSizePolicy.Expanding,
             QtWidgets.QSizePolicy.Expanding
-            )
+        )
 
-        self.configuration_layout = QtWidgets.QHBoxLayout()
+        self.tool_panel = JOWToolPanel()
+        self.cache_panel = JOWCachePanel()
+        self.settings_panel = JOWSettingsPanel()
 
+        controls_layout.addWidget(self.tool_panel)
+        controls_layout.addWidget(self.cache_panel)
+        controls_layout.addWidget(self.settings_panel)
 
-        ##########################################################
-        # Primary
-        ##########################################################
-        self.configuration_layout.addWidget(QtWidgets.QLabel("Primary Axis"))
-        self.primary_combo = QtWidgets.QComboBox()
-        self.primary_combo.addItems(["X", "Y", "Z"])
-        self.disable_combo_keyboard_focus(self.primary_combo)
-        self.configuration_layout.addWidget(self.primary_combo)
-
-        ##########################################################
-        # Secondary
-        ##########################################################
-        self.configuration_layout.addWidget(QtWidgets.QLabel("Secondary Axis"))
-        self.secondary_combo = QtWidgets.QComboBox()
-        self.secondary_combo.addItems(["X", "Y", "Z"])
-        self.disable_combo_keyboard_focus(self.secondary_combo)
-        self.secondary_combo.setCurrentText("Y")
-
-        self.configuration_layout.addWidget(self.secondary_combo)
-
-        ##########################################################
-        # Mode
-        ##########################################################
-        self.configuration_layout.addWidget(QtWidgets.QLabel("Secondary Mode"))
-        self.mode_combo = QtWidgets.QComboBox()
-        self.mode_combo.addItems([
-            "World",
-            "Previous",
-            "Curve Plane",
-            "Custom Object"
-        ])
-        self.disable_combo_keyboard_focus(self.mode_combo)
-
-        self.configuration_layout.addWidget(self.mode_combo)
-        layout.addLayout(self.configuration_layout)
-
-        ##########################################################
-        # Guide
-        ##########################################################
-        guide_layout = QtWidgets.QHBoxLayout()
-
-        create_guide_btn = QtWidgets.QPushButton("Create Guide Locator")
-        create_guide_btn.clicked.connect(self.create_guide)
-
-        select_guide_btn = QtWidgets.QPushButton("Select Guide")
-        select_guide_btn.clicked.connect(self.select_guide)
-
-        delete_guide_btn = QtWidgets.QPushButton("Delete Guide")
-        delete_guide_btn.clicked.connect(self.delete_guide)
-
-        pick_custom_object_btn = QtWidgets.QPushButton("Pick Custom Object")
-        pick_custom_object_btn.clicked.connect(self.pick_custom_object)
-
-        guide_layout.addWidget(create_guide_btn)
-        guide_layout.addWidget(select_guide_btn)
-        guide_layout.addWidget(delete_guide_btn)
-        guide_layout.addWidget(pick_custom_object_btn)
-
-        layout.addLayout(guide_layout)
-
-        ##########################################################
-        # Cache
-        ##########################################################
-        cache_layout = QtWidgets.QVBoxLayout()
-
-        cache_header_layout = QtWidgets.QHBoxLayout()
-
-        self.cached_guide_label = QtWidgets.QLabel("Guide: None")
-
-        self.lock_selection_checkbox = QtWidgets.QCheckBox("Lock Cached Chain")
-        self.apply_cached_chain_checkbox = QtWidgets.QCheckBox("Apply to Cached Chain")
-        self.apply_cached_chain_checkbox.setChecked(True)
-
-        refresh_selection_btn = QtWidgets.QPushButton("Set Cache From Selection")
-        refresh_selection_btn.clicked.connect(self.refresh_cache_from_selection)
-
-        clear_cache_btn = QtWidgets.QPushButton("Clear Cache")
-        clear_cache_btn.clicked.connect(self.clear_cached_chain)
-
-        cache_header_layout.addWidget(self.cached_guide_label)
-        cache_header_layout.addWidget(self.lock_selection_checkbox)
-        cache_header_layout.addWidget(self.apply_cached_chain_checkbox)
-        cache_header_layout.addWidget(refresh_selection_btn)
-        cache_header_layout.addWidget(clear_cache_btn)
-
-        cache_layout.addLayout(cache_header_layout)
-
-        self.cached_chain_log = QtWidgets.QTextEdit()
-        self.cached_chain_log.setReadOnly(True)
-        self.cached_chain_log.setMaximumHeight(90)
-        self.cached_chain_log.setPlaceholderText("Cached chains will appear here...")
-        self.cached_chain_log.setStyleSheet(
-            "background-color: #181818; color: #dddddd; border: 1px solid #444444;"
-            )
-
-        cache_layout.addWidget(self.cached_chain_log)
-
-        layout.addLayout(cache_layout)
-
-        ##########################################################
-        # Viewport Controls
-        ##########################################################
-        viewport_controls_layout = QtWidgets.QHBoxLayout()
-        viewport_controls_layout.addWidget(QtWidgets.QLabel("Projection"))
-        self.projection_combo = QtWidgets.QComboBox()
-        self.projection_combo.addItems(["XY", "XZ", "ZY", "Orbit"])
-        self.disable_combo_keyboard_focus(self.projection_combo)
-        self.projection_combo.currentTextChanged.connect(self.change_projection)
-        viewport_controls_layout.addWidget(self.projection_combo)
-
-        reset_view_btn = QtWidgets.QPushButton("Reset View")
-        reset_view_btn.clicked.connect(self.reset_view)
-
-        frame_preview_btn = QtWidgets.QPushButton("Frame Preview")
-        frame_preview_btn.clicked.connect(self.frame_preview)
-        viewport_controls_layout.addWidget(frame_preview_btn)
-
-        frame_selected_btn = QtWidgets.QPushButton("Frame Selected")
-        frame_selected_btn.clicked.connect(self.frame_selected_joint)
-        viewport_controls_layout.addWidget(frame_selected_btn)
-
-        viewport_controls_layout.addWidget(reset_view_btn)
-        layout.addLayout(viewport_controls_layout)
-
-        ##########################################################
-        # Options
-        ##########################################################
-        options_layout = QtWidgets.QHBoxLayout()
-
-        self.flip_plane_checkbox = QtWidgets.QCheckBox("Flip Plane")
-        self.average_normals_checkbox = QtWidgets.QCheckBox("Average Plane Normals")
-        self.show_joint_names_checkbox = QtWidgets.QCheckBox("Show Joint Names")
-        self.show_grid_checkbox = QtWidgets.QCheckBox("Show Grid")
-        self.show_axis_gizmo_checkbox = QtWidgets.QCheckBox("Show Axis Gizmo")
-
-        self.average_normals_checkbox.setChecked(True)
-        self.show_grid_checkbox.setChecked(True)
-        self.show_axis_gizmo_checkbox.setChecked(True)
-
-        options_layout.addWidget(self.flip_plane_checkbox)
-        options_layout.addWidget(self.average_normals_checkbox)
-        options_layout.addWidget(self.show_joint_names_checkbox)
-        options_layout.addWidget(self.show_grid_checkbox)
-        options_layout.addWidget(self.show_axis_gizmo_checkbox)
-
-        layout.addLayout(options_layout)
-
-        ##########################################################
-        # Viewport Sizes
-        ##########################################################
-        viewport_size_layout = QtWidgets.QHBoxLayout()
-
-        viewport_size_layout.addWidget(QtWidgets.QLabel("Axis Length"))
-
-        self.axis_length_spinbox = QtWidgets.QSpinBox()
-        self.axis_length_spinbox.setRange(5, 200)
-        self.axis_length_spinbox.setValue(28)
-        viewport_size_layout.addWidget(self.axis_length_spinbox)
-
-        viewport_size_layout.addWidget(QtWidgets.QLabel("Joint Size"))
-
-        self.joint_size_spinbox = QtWidgets.QSpinBox()
-        self.joint_size_spinbox.setRange(2, 30)
-        self.joint_size_spinbox.setValue(5)
-        viewport_size_layout.addWidget(self.joint_size_spinbox)
-
-        viewport_size_layout.addWidget(QtWidgets.QLabel("Normal Length"))
-
-        self.normal_length_spinbox = QtWidgets.QSpinBox()
-        self.normal_length_spinbox.setRange(5, 300)
-        self.normal_length_spinbox.setValue(60)
-        viewport_size_layout.addWidget(self.normal_length_spinbox)
-
-        layout.addLayout(viewport_size_layout)
-
-        ##########################################################
-        # Viewport
-        ##########################################################
         self.viewport = JOW_viewport.JOWViewport()
         self.viewport.setSizePolicy(
             QtWidgets.QSizePolicy.Expanding,
             QtWidgets.QSizePolicy.Expanding
         )
 
-        viewport_layout.addWidget(self.viewport, 1)
+        viewport_layout.addWidget(
+            self.viewport,
+            1
+        )
 
-
-        self.viewport.joint_clicked.connect(self.select_joint_from_viewport)
-        
-        ##########################################################
-        # Bottom Actions
-        ##########################################################
         bottom_actions_layout = QtWidgets.QHBoxLayout()
+        bottom_actions_layout.setContentsMargins(0, 0, 0, 0)
+        bottom_actions_layout.setSpacing(4)
 
-        rebuild_preview_btn = QtWidgets.QPushButton("Rebuild Preview")
-        rebuild_preview_btn.clicked.connect(self.refresh_preview)
+        self.apply_btn = create_action_button(
+            "Apply Orientation",
+            minimum_width=150
+        )
 
-        debug_preview_btn = QtWidgets.QPushButton("Debug Preview Data")
-        debug_preview_btn.clicked.connect(self.debug_preview_data)
+        bottom_actions_layout.addStretch(1)
 
-        apply_btn = QtWidgets.QPushButton("Apply Orientation")
-        #apply_btn.setMinimumHeight(40)
-        apply_btn.clicked.connect(self.apply_orientation)
-
-        bottom_actions_layout.addWidget(rebuild_preview_btn)
-        bottom_actions_layout.addWidget(debug_preview_btn)
-        bottom_actions_layout.addWidget(apply_btn)
+        bottom_actions_layout.addWidget(self.apply_btn)
 
         viewport_layout.addLayout(bottom_actions_layout)
 
-        ##########################################################
-        # Warnings
-        ##########################################################
         self.warning_label = QtWidgets.QLabel("Logger: ")
         self.warning_label.setStyleSheet("color: #ffcc66;")
         self.warning_label.setWordWrap(True)
 
         viewport_layout.addWidget(self.warning_label)
 
-
         self.main_splitter.addWidget(self.controls_widget)
+
         self.main_splitter.addWidget(self.viewport_widget)
 
         self.main_splitter.setStretchFactor(0, 0)
         self.main_splitter.setStretchFactor(1, 1)
+        self.main_splitter.setSizes([245, 520])
 
-        self.main_splitter.setSizes([360, 520])
+        main_layout.addWidget(
+            self.main_splitter
+        )
 
-        main_layout.addWidget(self.main_splitter)
+    ##########################################################
+    # Signals
+    ##########################################################
 
-        self.update_axis_combo_options()
-        self.update_cache_labels()
-        self.update_viewport_display_options()
-        self.update_viewport_sizes()
-        self.connect_signals()
+    def connect_signals(self):
+        self.tool_panel.settings_changed.connect(self.refresh_preview_from_ui)
+        self.tool_panel.create_guide_requested.connect(self.create_guide)
+        self.tool_panel.select_guide_requested.connect(self.select_guide)
+        self.tool_panel.delete_guide_requested.connect(self.delete_guide)
+        self.tool_panel.pick_custom_object_requested.connect(self.pick_custom_object)
+
+        self.cache_panel.replace_cache_requested.connect(self.refresh_cache_from_selection)
+        self.cache_panel.add_selection_requested.connect(self.add_selection_to_cache)
+        self.cache_panel.remove_selected_requested.connect(self.remove_selected_cached_roots)
+        self.cache_panel.clear_cache_requested.connect(self.clear_cached_chain)
+        self.cache_panel.cached_root_double_clicked.connect(self.select_cached_root)
+        self.cache_panel.lock_cache_toggled.connect(self.on_lock_selection_changed)
+        self.cache_panel.apply_cached_toggled.connect(self.refresh_preview_from_ui)
+
+        self.settings_panel.display_options_changed.connect(self.update_viewport_display_options)
+        self.settings_panel.preview_settings_changed.connect(self.refresh_preview_from_ui)
+        self.settings_panel.sizes_changed.connect(self.update_viewport_sizes)
+        self.settings_panel.live_sync_toggled.connect(self.update_live_sync_state)
+
+        self.settings_panel.native_rotation_axes_toggled.connect(self.set_cached_native_rotation_axes_visibility)
+
+        self.settings_panel.projection_changed.connect(self.change_projection)
+        self.settings_panel.frame_preview_requested.connect(self.frame_preview)
+        self.settings_panel.frame_selected_requested.connect(self.frame_selected_joint)
+        self.settings_panel.reset_view_requested.connect(self.reset_view)
+
+        self.viewport.joint_clicked.connect(self.select_joint_from_viewport)
+        self.viewport.guide_clicked.connect(self.select_guide_from_viewport)
+        self.viewport.viewport_empty_clicked.connect(self.clear_selection_from_viewport)
+
+        self.apply_btn.clicked.connect(self.apply_orientation)
+
+    ##########################################################
+    # Settings
+    ##########################################################
 
     def get_settings(self):
         settings = OrientationSettings(
-            primary_axis=self.primary_combo.currentText(),
-            secondary_axis=self.secondary_combo.currentText(),
-            secondary_mode=self.mode_combo.currentText(),
-            flip_plane=self.flip_plane_checkbox.isChecked(),
-            average_normals=self.average_normals_checkbox.isChecked()
+            primary_axis=self.tool_panel.primary_axis(),
+            secondary_axis=self.tool_panel.secondary_axis(),
+            secondary_mode=self.tool_panel.secondary_mode(),
+            flip_plane=self.settings_panel.flip_plane(),
+            average_normals=self.settings_panel.average_normals(),
+            orient_end_joint=self.settings_panel.orient_end_joint()
         )
 
-        if self.apply_cached_chain_checkbox.isChecked():
+        if self.cache_panel.apply_cached():
             settings.roots = JOW_preview.get_preview_roots()
 
         return settings
-    
-    def disable_combo_keyboard_focus(self, combo):
-        combo.setFocusPolicy(QtCore.Qt.NoFocus)
-
-    def focus_viewport(self):
-        self.viewport.setFocus()
 
     ##########################################################
-    # Cache methods
+    # Script Jobs
     ##########################################################
+
+    def create_selection_script_job(self):
+        self.delete_selection_script_job()
+
+        self.selection_script_job = cmds.scriptJob(
+            event=[
+                "SelectionChanged",
+                self.on_maya_selection_changed
+            ],
+            protected=True
+        )
+
+    def delete_selection_script_job(self):
+        if not self.selection_script_job:
+            return
+
+        if cmds.scriptJob(exists=self.selection_script_job):
+            cmds.scriptJob(
+                kill=self.selection_script_job,
+                force=True
+            )
+
+        self.selection_script_job = None
+
+    def on_maya_selection_changed(self):
+        if self._syncing_selection_from_viewport:
+            self.update_set_cache_button_state()
+            return
+
+        self.sync_viewport_selection_from_maya()
+        self.update_set_cache_button_state()
+
+    def closeEvent(self, event):
+        self.stop_live_sync_timer()
+        self.delete_selection_script_job()
+
+        super(JOWWindow, self).closeEvent(event)
+
+    ##########################################################
+    # Cache
+    ##########################################################
+
+    def refresh_cache_panel(self):
+        removed_count = JOW_preview.validate_cache_and_get_removed_count()
+        roots = JOW_preview.get_cached_roots()
+        custom_object = JOW_preview.get_cached_custom_object()
+
+        self.cache_panel.update_cache_display(
+            roots,
+            custom_object
+        )
+
+        if removed_count > 0:
+            self.set_warning(
+                "{} cached root(s) no longer exist and were removed.".format(
+                    removed_count
+                )
+            )
+
+        self.update_set_cache_button_state()
 
     def refresh_cache_from_selection(self):
-        JOW_preview.refresh_cache_from_selection()
-        self.update_cache_labels()
+        roots = JOW_preview.refresh_cache_from_selection()
+
+        self.refresh_cache_panel()
         self.refresh_preview()
+        self.reset_live_sync_snapshot()
+        self.update_set_cache_button_state()
+
+        if roots:
+            self.set_warning(
+                "Cache replaced from selection: {} root(s).".format(
+                    len(roots)
+                )
+            )
+        else:
+            self.set_warning("No joint roots found in selection.")
 
     def clear_cached_chain(self):
         JOW_preview.clear_cache()
 
         self.viewport.set_preview_chains([])
         self.viewport.set_selected_joint(None)
+        self.viewport.set_selected_guide(None)
 
-        self.update_cache_labels()
+        self.live_sync_snapshot = {}
+
+        self.refresh_cache_panel()
         self.set_warning("Cache cleared.")
+        self.update_set_cache_button_state()
 
+    def add_selection_to_cache(self):
+        roots = JOW_preview.get_unique_roots_from_selection_for_cache()
 
-    def update_cache_labels(self):
-        removed_count = JOW_preview.validate_cache_and_get_removed_count()
+        if not roots:
+            self.set_warning(
+                "Select one or more joints to add their root chains to the cache."
+            )
+            return
+
+        JOW_preview.add_roots_to_cache(
+            roots
+        )
+
+        self.refresh_cache_panel()
+        self.refresh_preview()
+        self.reset_live_sync_snapshot()
+        self.update_set_cache_button_state()
+
+        self.set_warning(
+            "Added {} root(s) to cache.".format(
+                len(roots)
+            )
+        )
+
+    def remove_selected_cached_roots(self, roots):
+        if not roots:
+            self.set_warning("Select one or more cached roots to remove.")
+            return
+
+        JOW_preview.remove_cached_roots(roots)
+        self.refresh_cache_panel()
+        self.refresh_preview(preserve_cache=True)
+
+        self.reset_live_sync_snapshot()
+        self.update_set_cache_button_state()
+
+        self.set_warning(
+            "Removed {} cached root(s).".format(
+                len(roots)
+            )
+        )
+
+    def select_cached_root(self, root):
+        if not root:
+            return
+
+        if not cmds.objExists(root):
+            self.set_warning(
+                "Cached root no longer exists: {}".format(
+                    root
+                )
+            )
+
+            self.refresh_cache_panel()
+            return
+
+        cmds.select(root,r=True)
+        self.viewport.set_selected_joint(root)
+        self.viewport.set_selected_guide(None)
+
+        self.sync_viewport_selection_from_maya()
+        self.update_set_cache_button_state()
+
+        self.set_warning(
+            "Selected cached root: {}".format(
+                root.split("|")[-1]
+            )
+        )
+
+    def selection_has_joint(self):
+        selected = cmds.ls(
+            sl=True,
+            long=True
+        ) or []
+
+        if not selected:
+            return False
+
+        joints = cmds.ls(
+            selected,
+            type="joint",
+            long=True
+        ) or []
+
+        return bool(joints)
+
+    def cache_is_empty(self):
+        roots = JOW_preview.get_cached_roots()
+
+        return not bool(roots)
+
+    def update_set_cache_button_state(self):
+        should_prompt_cache = (
+            self.cache_is_empty() and
+            self.selection_has_joint()
+        )
+
+        self.cache_panel.update_set_cache_prompt(should_prompt_cache)
+
+    def on_lock_selection_changed(self, *args):
+        JOW_preview.set_cache_locked(
+            self.cache_panel.is_cache_locked()
+        )
+
+        self.refresh_cache_panel()
+        self.refresh_preview()
+
+    def get_cached_joint_nodes(self):
+        nodes = []
 
         roots = JOW_preview.get_cached_roots()
-        custom_object = JOW_preview.get_cached_custom_object()
 
-        if roots:
-            lines = ["Cached Roots:"]
+        for root in roots:
+            if not cmds.objExists(root):
+                continue
 
-            for i, root in enumerate(roots):
-                lines.append(
-                    "{:02d}. {}".format(
-                        i + 1,
-                        root.split("|")[-1]
+            joints = JOW_core.get_chain_joints(
+                root
+            )
+
+            for joint in joints:
+                if not cmds.objExists(joint):
+                    continue
+
+                if joint not in nodes:
+                    nodes.append(
+                        joint
                     )
-                )
 
-            self.cached_chain_log.setPlainText("\n".join(lines))
-        else:
-            self.cached_chain_log.setPlainText("Cached Roots: None")
+        return nodes
+    ##########################################################
+    # Viewport Display
+    ##########################################################
 
-        if custom_object:
-            self.cached_guide_label.setText(
-                "Guide: {}".format(custom_object.split("|")[-1])
-            )
-        else:
-            self.cached_guide_label.setText("Guide: None")
+    def update_viewport_display_options(self, *args):
+        self.viewport.set_show_grid(self.settings_panel.show_grid())
+        self.viewport.set_show_axis_gizmo(self.settings_panel.show_axis_gizmo())
+        self.viewport.set_show_3d_joints(self.settings_panel.show_3d_joints())
+        self.viewport.set_show_curve_plane_surface(self.settings_panel.show_plane())
+        self.viewport.set_show_current_axes(self.settings_panel.show_current_axes())
+        self.viewport.set_show_preview_axes(self.settings_panel.show_preview_axes())
+        self.viewport.set_show_overlay(self.settings_panel.show_overlay())
+        self.viewport.set_show_delta_heatmap(self.settings_panel.show_delta_heatmap())
 
-        if removed_count > 0:
-            self.set_warning(
-                "{} cached root(s) no longer exist and were removed.".format(removed_count)
-            )
-
-    def update_viewport_display_options(self):
-        self.viewport.set_show_grid(
-            self.show_grid_checkbox.isChecked()
-        )
-
-        self.viewport.set_show_axis_gizmo(
-            self.show_axis_gizmo_checkbox.isChecked()
-        )
-
+        self.viewport.update()
 
     def update_viewport_sizes(self):
-        self.viewport.set_axis_length(
-            self.axis_length_spinbox.value()
-        )
+        self.viewport.set_axis_length(self.settings_panel.axis_length())
+        self.viewport.set_joint_size(self.settings_panel.joint_size())
+        self.viewport.set_normal_length(self.settings_panel.normal_length())
 
-        self.viewport.set_joint_size(
-            self.joint_size_spinbox.value()
-        )
-
-        self.viewport.set_normal_length(
-            self.normal_length_spinbox.value()
-        )
-
+        self.viewport.update()
 
     def frame_preview(self):
         self.viewport.frame_preview()
 
-
     def frame_selected_joint(self):
         self.viewport.frame_selected_joint()
 
-    def get_next_axis_except(self, forbidden_axis, current_axis=None):
-        axes = self.AXES[:]
-
-        if current_axis in axes:
-            start_index = axes.index(current_axis) + 1
-        else:
-            start_index = 0
-
-        for i in range(len(axes)):
-            axis = axes[(start_index + i) % len(axes)]
-
-            if axis != forbidden_axis:
-                return axis
-
-        return "X"
-
-
-    def on_lock_selection_changed(self):
-        JOW_preview.set_cache_locked(
-            self.lock_selection_checkbox.isChecked()
-        )
-
-        self.update_cache_labels()
-        self.refresh_preview()
-
-
-    def set_combo_value_silent(self, combo, value):
-        old_state = combo.blockSignals(True)
-        combo.setCurrentText(value)
-        combo.blockSignals(old_state)
-
-
-    def set_axis_enabled(self, combo, axis, enabled):
-        index = combo.findText(axis)
-
-        if index < 0:
-            return
-
-        item = combo.model().item(index)
-
-        if item:
-            item.setEnabled(enabled)
-
-
-    def update_axis_combo_options(self):
-        primary_axis = self.primary_combo.currentText()
-
-        for axis in self.AXES:
-            self.set_axis_enabled(
-                self.secondary_combo,
-                axis,
-                axis != primary_axis
-            )
-
-    def get_next_valid_secondary_axis(self, forbidden_axis, current_axis):
-        axes = self.AXES[:]
-
-        if current_axis in axes:
-            start_index = axes.index(current_axis) + 1
-        else:
-            start_index = 0
-
-        for i in range(len(axes)):
-            axis = axes[(start_index + i) % len(axes)]
-
-            if axis != forbidden_axis:
-                return axis
-
-        return "Y"
-
-    def on_primary_axis_changed(self, value):
-        if self._updating_axis_combos:
-            return
-
-        self._updating_axis_combos = True
-
-        try:
-            secondary_axis = self.secondary_combo.currentText()
-
-            if secondary_axis == value:
-                new_secondary_axis = self.get_next_valid_secondary_axis(
-                    value,
-                    secondary_axis
-                )
-
-                self.set_combo_value_silent(
-                    self.secondary_combo,
-                    new_secondary_axis
-                )
-
-            self.update_axis_combo_options()
-
-        finally:
-            self._updating_axis_combos = False
-
-        self.refresh_preview()
-        self.focus_viewport()
-
-    def on_secondary_axis_changed(self, value):
-        if self._updating_axis_combos:
-            return
-
-        self._updating_axis_combos = True
-
-        try:
-            primary_axis = self.primary_combo.currentText()
-
-            if value == primary_axis:
-                new_secondary_axis = self.get_next_valid_secondary_axis(
-                    primary_axis,
-                    value
-                )
-
-                self.set_combo_value_silent(
-                    self.secondary_combo,
-                    new_secondary_axis
-                )
-
-            self.update_axis_combo_options()
-
-        finally:
-            self._updating_axis_combos = False
-
-        self.refresh_preview()
-        self.focus_viewport()
+    ##########################################################
+    # Logger
+    ##########################################################
 
     def set_warning(self, message):
         self.warning_label.setText(message)
 
-
     def clear_warning(self):
         self.warning_label.setText("")
 
-    def connect_signals(self):
-        self.primary_combo.currentTextChanged.connect(self.on_primary_axis_changed)
-        self.secondary_combo.currentTextChanged.connect(self.on_secondary_axis_changed)
-        self.mode_combo.currentTextChanged.connect(self.refresh_preview)
-
-        self.flip_plane_checkbox.stateChanged.connect(self.refresh_preview)
-        self.average_normals_checkbox.stateChanged.connect(self.refresh_preview)
-        self.show_joint_names_checkbox.stateChanged.connect(self.refresh_preview)
-
-        self.lock_selection_checkbox.stateChanged.connect(self.on_lock_selection_changed)
-        self.apply_cached_chain_checkbox.stateChanged.connect(self.refresh_preview)
-
-        self.show_grid_checkbox.stateChanged.connect(self.update_viewport_display_options)
-        self.show_axis_gizmo_checkbox.stateChanged.connect(self.update_viewport_display_options)
-
-        self.axis_length_spinbox.valueChanged.connect(self.update_viewport_sizes)
-        self.joint_size_spinbox.valueChanged.connect(self.update_viewport_sizes)
-        self.normal_length_spinbox.valueChanged.connect(self.update_viewport_sizes)
-
     ##########################################################
-    # Secondary Axis Guide Manager
+    # Guide Manager
     ##########################################################
 
     def create_guide(self):
         guide = JOW_guides.create_guide()
 
         if guide:
-            cmds.select(guide, r=True)
+            cmds.select(guide,r=True)
+
             JOW_preview.update_cached_custom_object_from_selection()
+            self.viewport.set_selected_guide(guide)
+            self.viewport.set_selected_joint(None)
 
-        self.update_cache_labels()
+        self.refresh_cache_panel()
         self.refresh_preview()
-
+        self.reset_live_sync_snapshot()
 
     def select_guide(self):
         guide = JOW_guides.select_guide()
 
         if guide:
             JOW_preview.update_cached_custom_object_from_selection()
-            self.set_warning("Guide selected: {}".format(guide.split("|")[-1]))
+            self.viewport.set_selected_guide(guide)
+            self.viewport.set_selected_joint(None)
 
-        self.update_cache_labels()
+            self.set_warning(
+                "Guide selected: {}".format(
+                    guide.split("|")[-1]
+                )
+            )
+
+        self.refresh_cache_panel()
         self.refresh_preview()
-
 
     def delete_guide(self):
         JOW_guides.delete_guide()
 
         self.set_warning("Guide deleted.")
-        self.update_cache_labels()
+        self.refresh_cache_panel()
         self.refresh_preview()
-
 
     def pick_custom_object(self):
         custom_object = JOW_guides.get_selected_custom_object()
@@ -603,75 +537,110 @@ class JOWWindow(QtWidgets.QDialog):
             )
         )
 
-        self.update_cache_labels()
+        self.refresh_cache_panel()
         self.refresh_preview()
+        self.reset_live_sync_snapshot()
 
+    ##########################################################
+    # Preview / Apply
+    ##########################################################
 
-
-    def change_projection(self):
-        self.viewport.set_projection_mode(self.projection_combo.currentText())
+    def change_projection(self, projection_mode):
+        self.viewport.set_projection_mode(projection_mode)
         self.focus_viewport()
 
     def reset_view(self):
         self.viewport.reset_view()
 
-    def refresh_preview(self):
-        JOW_preview.set_cache_locked(self.lock_selection_checkbox.isChecked())
+    def refresh_preview_from_ui(self, *args):
+        self.refresh_preview(preserve_cache=False)
 
-        settings = self.get_settings()
+    def refresh_preview(self, preserve_cache=False):
+        old_cache_locked_state = JOW_preview.is_cache_locked()
 
-        preview_chains = JOW_preview.build_preview_chains(settings)
-        if settings.secondary_mode == "Custom Object" and not settings.custom_object:
-            self.set_warning("Custom Object mode needs a valid non-joint guide object.")
-        
-        self.viewport.set_secondary_mode(settings.secondary_mode)
-        self.viewport.set_show_joint_names(self.show_joint_names_checkbox.isChecked())
-        self.viewport.set_preview_chains(preview_chains)
-
-        selected = cmds.ls(sl=True, long=True) or []
-        if selected:
-            self.viewport.set_selected_joint(selected[0])
-
-        self.update_cache_labels()
-        if not preview_chains:
-            self.set_warning("No valid cached or selected joint chains found.")
-        elif settings.secondary_mode == "Custom Object" and not settings.custom_object:
-            self.set_warning("Custom Object mode needs a valid non-joint guide object.")
+        if preserve_cache:
+            JOW_preview.set_cache_locked(True)
         else:
-            self.clear_warning()
+            JOW_preview.set_cache_locked(self.cache_panel.is_cache_locked())
 
-        print("JOW preview refreshed:", len(preview_chains), "chain(s)")
-        self.focus_viewport()
+        try:
+            settings = self.get_settings()
 
-    def debug_preview_data(self):
-        settings = self.get_settings()
-        preview_chains = JOW_preview.build_preview_chains(settings)
-        print("JOW Preview Chains:", len(preview_chains))
+            if self.cache_panel.apply_cached():
+                apply_target_label = "Cached Chain"
+            else:
+                apply_target_label = "Selection"
 
-        for chain in preview_chains:
-            print("CHAIN:", chain.root)
+            self.viewport.set_overlay_context(
+                settings,
+                apply_target_label
+            )
 
-            for joint in chain.joints:
-                print(
-                    joint.name,
-                    "POS:", joint.position,
-                    "X:", joint.x_axis,
-                    "Y:", joint.y_axis,
-                    "Z:", joint.z_axis
+            preview_chains = JOW_preview.build_preview_chains(settings)
+
+            if (
+                settings.secondary_mode == "Custom Object" and
+                not settings.custom_object
+            ):
+                self.set_warning(
+                    "Custom Object mode needs a valid non-joint guide object."
+                )
+            self.viewport.set_secondary_mode(settings.secondary_mode)
+            self.viewport.set_show_joint_names(self.settings_panel.show_joint_names()            )
+            self.viewport.set_preview_chains(preview_chains)
+
+            self.sync_viewport_selection_from_maya()
+            self.refresh_cache_panel()
+
+            if not preview_chains:
+                self.set_warning(
+                    "No valid cached or selected joint chains found."
+                )
+
+            elif (
+                settings.secondary_mode == "Custom Object" and
+                not settings.custom_object
+            ):
+                self.set_warning(
+                    "Custom Object mode needs a valid non-joint guide object."
+                )
+
+            else:
+                self.clear_warning()
+
+            print(
+                "JOW preview refreshed:",
+                len(preview_chains),
+                "chain(s)"
+            )
+
+            self.focus_viewport()
+
+        finally:
+            if preserve_cache:
+                JOW_preview.set_cache_locked(
+                    old_cache_locked_state
                 )
 
     def apply_orientation(self):
         settings = self.get_settings()
 
-        if self.apply_cached_chain_checkbox.isChecked() and not settings.roots:
-            self.set_warning("Apply To Cached Chain is enabled, but no cached chain exists.")
+        if (
+            self.cache_panel.apply_cached() and
+            not settings.roots
+        ):
+            self.set_warning("Apply To Cached Chain is enabled, but no cached chain exists."            )
             return
-
         JOW_core.apply_orientation(settings)
+
         self.refresh_preview()
+        self.reset_live_sync_snapshot()
+
+    def focus_viewport(self):
+        self.viewport.setFocus()
 
     ##########################################################
-    # Viewport Controls on Selection Diagnostics
+    # Viewport Selection
     ##########################################################
 
     def select_joint_from_viewport(self, joint_name):
@@ -681,7 +650,365 @@ class JOWWindow(QtWidgets.QDialog):
         if not cmds.objExists(joint_name):
             return
 
-        cmds.select(joint_name, r=True)
-        self.viewport.set_selected_joint(joint_name)
+        self._syncing_selection_from_viewport = True
 
-        print("JOW viewport selected:", joint_name)
+        try:
+            cmds.select(joint_name, r=True)
+
+            self.viewport.set_selected_joint(joint_name)
+            self.viewport.set_selected_guide(None)
+
+        finally:
+            self._syncing_selection_from_viewport = False
+
+        self.update_set_cache_button_state()
+
+        print(
+            "JOW viewport selected:",
+            joint_name
+        )
+
+    def select_guide_from_viewport(self, guide_name):
+        if not guide_name:
+            return
+
+        if not cmds.objExists(guide_name):
+            return
+
+        self._syncing_selection_from_viewport = True
+
+        try:
+            cmds.select(
+                guide_name,
+                r=True
+            )
+
+            JOW_preview.update_cached_custom_object_from_selection()
+            self.viewport.set_selected_guide(guide_name)
+            self.viewport.set_selected_joint(None)
+
+        finally:
+            self._syncing_selection_from_viewport = False
+
+        self.refresh_cache_panel()
+        self.update_set_cache_button_state()
+
+        self.set_warning(
+            "Guide selected from viewport: {}".format(
+                guide_name.split("|")[-1]
+            )
+        )
+
+        print(
+            "JOW viewport selected guide:",
+            guide_name
+        )
+
+    def clear_selection_from_viewport(self):
+        self._syncing_selection_from_viewport = True
+
+        try:
+            cmds.select(
+                clear=True
+            )
+
+            self.viewport.set_selected_joint(
+                None
+            )
+
+            self.viewport.set_selected_guide(
+                None
+            )
+
+        finally:
+            self._syncing_selection_from_viewport = False
+
+        self.update_set_cache_button_state()
+
+        print(
+            "JOW viewport selection cleared."
+        )
+
+    ##########################################################
+    # Native Maya Selection Sync
+    ##########################################################
+
+    def get_first_selected_maya_item(self):
+        selected = cmds.ls(
+            sl=True,
+            long=True
+        ) or []
+
+        if not selected:
+            return None
+
+        return selected[0]
+
+    def maya_item_is_preview_guide(self, item):
+        if not item:
+            return False
+
+        if not cmds.objExists(item):
+            return False
+
+        for chain in self.viewport.preview_chains:
+            if not chain.guide:
+                continue
+
+            if not chain.guide.name:
+                continue
+
+            if chain.guide.name == item:
+                return True
+
+        return False
+
+    def maya_item_is_preview_joint(self, item):
+        if not item:
+            return False
+
+        if not cmds.objExists(item):
+            return False
+
+        for chain in self.viewport.preview_chains:
+            for joint in chain.joints:
+                if joint.name == item:
+                    return True
+
+        return False
+
+    def sync_viewport_selection_from_maya(self):
+        selected_item = self.get_first_selected_maya_item()
+
+        if not selected_item:
+            self.viewport.set_selected_joint(None)
+            self.viewport.set_selected_guide(None)
+            return
+
+        if self.maya_item_is_preview_joint(selected_item):
+            self.viewport.set_selected_joint(selected_item)
+            self.viewport.set_selected_guide(None)
+            return
+
+        if self.maya_item_is_preview_guide(selected_item):
+            self.viewport.set_selected_guide(selected_item)
+            self.viewport.set_selected_joint(None)
+            return
+
+        self.viewport.set_selected_joint(None)
+        self.viewport.set_selected_guide(None)
+
+    ##########################################################
+    # Native Maya Viewport Live Sync
+    ##########################################################
+
+    def create_live_sync_timer(self):
+        self.live_sync_timer = QtCore.QTimer(self)
+
+        self.live_sync_timer.setInterval(
+            self.live_sync_interval_ms
+        )
+
+        self.live_sync_timer.timeout.connect(
+            self.check_live_sync_matrix_changes
+        )
+
+        self.reset_live_sync_snapshot()
+
+        if self.settings_panel.live_sync_enabled():
+            self.live_sync_timer.start()
+
+    def update_live_sync_state(self, *args):
+        if not self.live_sync_timer:
+            return
+
+        if self.settings_panel.live_sync_enabled():
+            self.reset_live_sync_snapshot()
+            self.live_sync_timer.start()
+
+        else:
+            self.live_sync_timer.stop()
+            self.live_sync_snapshot = {}
+
+    def stop_live_sync_timer(self):
+        if not self.live_sync_timer:
+            return
+
+        self.live_sync_timer.stop()
+
+    def get_live_sync_nodes(self):
+        nodes = []
+
+        roots = JOW_preview.get_cached_roots()
+
+        for root in roots:
+            if not cmds.objExists(root):
+                continue
+
+            joints = JOW_core.get_chain_joints(
+                root
+            )
+
+            for joint in joints:
+                if not cmds.objExists(joint):
+                    continue
+
+                if joint not in nodes:
+                    nodes.append(
+                        joint
+                    )
+
+        custom_object = JOW_preview.get_cached_custom_object()
+
+        if custom_object and cmds.objExists(custom_object):
+            if custom_object not in nodes:
+                nodes.append(
+                    custom_object
+                )
+
+        return nodes
+
+    def get_world_matrix_snapshot(self):
+        snapshot = {}
+
+        nodes = self.get_live_sync_nodes()
+
+        for node in nodes:
+            if not cmds.objExists(node):
+                continue
+
+            try:
+                matrix = cmds.xform(
+                    node,
+                    q=True,
+                    ws=True,
+                    matrix=True
+                )
+
+            except Exception:
+                continue
+
+            snapshot[node] = matrix
+
+        return snapshot
+
+    def reset_live_sync_snapshot(self):
+        self.live_sync_snapshot = self.get_world_matrix_snapshot()
+
+    def matrices_are_different(self, matrix_a, matrix_b):
+        if matrix_a is None or matrix_b is None:
+            return True
+
+        if len(matrix_a) != len(matrix_b):
+            return True
+
+        for a, b in zip(matrix_a, matrix_b):
+            if abs(a - b) > self.live_sync_tolerance:
+                return True
+
+        return False
+
+    def snapshots_are_different(self, snapshot_a, snapshot_b):
+        if set(snapshot_a.keys()) != set(snapshot_b.keys()):
+            return True
+
+        for node in snapshot_a:
+            matrix_a = snapshot_a.get(node)
+            matrix_b = snapshot_b.get(node)
+
+            if self.matrices_are_different(
+                matrix_a,
+                matrix_b
+            ):
+                return True
+
+        return False
+
+    def check_live_sync_matrix_changes(self):
+        if self._live_sync_refreshing:
+            return
+
+        if not self.settings_panel.live_sync_enabled():
+            return
+
+        new_snapshot = self.get_world_matrix_snapshot()
+
+        if not self.snapshots_are_different(
+            self.live_sync_snapshot,
+            new_snapshot
+        ):
+            return
+
+        self.live_sync_snapshot = new_snapshot
+        self.refresh_preview_from_live_sync()
+
+    def refresh_preview_from_live_sync(self):
+        if self._live_sync_refreshing:
+            return
+
+        self._live_sync_refreshing = True
+
+        try:
+            self.refresh_preview(
+                preserve_cache=True
+            )
+
+            self.reset_live_sync_snapshot()
+
+        finally:
+            self._live_sync_refreshing = False
+
+    def set_cached_native_rotation_axes_visibility(self, state):
+        cached_joints = set(
+            self.get_cached_joint_nodes()
+        )
+
+        nodes_to_disable = (
+            self.native_rotation_axis_nodes - cached_joints
+        )
+
+        for node in nodes_to_disable:
+            self.set_node_native_rotation_axis_visibility(
+                node,
+                False
+            )
+
+        for joint in cached_joints:
+            self.set_node_native_rotation_axis_visibility(
+                joint,
+                state
+            )
+
+        if state:
+            self.native_rotation_axis_nodes = cached_joints
+        else:
+            self.native_rotation_axis_nodes = set()
+
+        cmds.refresh()
+
+    def set_node_native_rotation_axis_visibility(
+        self,
+        node,
+        state
+    ):
+        if not node:
+            return
+
+        if not cmds.objExists(node):
+            return
+
+        attribute = "{}.displayLocalAxis".format(
+            node
+        )
+
+        if not cmds.objExists(attribute):
+            return
+
+        try:
+            cmds.setAttr(
+                attribute,
+                bool(state)
+            )
+
+        except Exception:
+            pass

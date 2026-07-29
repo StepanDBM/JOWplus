@@ -221,7 +221,10 @@ def compute_chain_orientation(root, settings):
     )
 
     for i, jnt in enumerate(joints):
-        child = get_first_child_joint(jnt)
+        is_end_joint = (i == len(joints) - 1)
+
+        if is_end_joint and not settings.orient_end_joint:
+            continue
 
         jnt_pos = JOW_math.get_world_pos(jnt)
 

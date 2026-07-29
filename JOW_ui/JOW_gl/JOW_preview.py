@@ -5,11 +5,20 @@ import maya.cmds as cmds
 class PreviewJoint:
     def __init__(self):
         self.name = ""
+
+        # Preview / proposed orientation.
         self.position = None
         self.x_axis = None
         self.y_axis = None
         self.z_axis = None
         self.matrix = None
+
+        # Current Maya orientation before Apply.
+        self.current_position = None
+        self.current_x_axis = None
+        self.current_y_axis = None
+        self.current_z_axis = None
+        self.current_matrix = None
 
 class PreviewChain:
     def __init__(self):
@@ -36,6 +45,14 @@ _CACHED_ROOTS = []
 _CACHED_CUSTOM_OBJECT = None
 
 _CACHE_LOCKED = False
+
+def get_current_world_matrix(joint):
+    return cmds.xform(
+        joint,
+        q=True,
+        ws=True,
+        matrix=True
+    )
 
 def get_cached_roots():
     roots, removed_count = validate_cached_roots()
@@ -161,6 +178,70 @@ def get_preview_custom_object(settings):
 
     return _CACHED_CUSTOM_OBJECT
 
+def set_cached_roots(roots):
+    global _CACHED_ROOTS
+
+    clean_roots = []
+
+    for root in roots:
+        if not root:
+            continue
+
+        if not cmds.objExists(root):
+            continue
+
+        if root not in clean_roots:
+            clean_roots.append(root)
+
+    _CACHED_ROOTS = clean_roots[:]
+
+    return _CACHED_ROOTS[:]
+
+def add_roots_to_cache(roots):
+    global _CACHED_ROOTS
+
+    validate_cached_roots()
+
+    for root in roots:
+        if not root:
+            continue
+
+        if not cmds.objExists(root):
+            continue
+
+        if root not in _CACHED_ROOTS:
+            _CACHED_ROOTS.append(root)
+
+    return _CACHED_ROOTS[:]
+
+def remove_cached_root(root):
+    global _CACHED_ROOTS
+
+    if not root:
+        return _CACHED_ROOTS[:]
+
+    _CACHED_ROOTS = [
+        cached_root for cached_root in _CACHED_ROOTS
+        if cached_root != root
+    ]
+
+    return _CACHED_ROOTS[:]
+
+def remove_cached_roots(roots):
+    global _CACHED_ROOTS
+
+    roots_to_remove = set(roots or [])
+
+    _CACHED_ROOTS = [
+        cached_root for cached_root in _CACHED_ROOTS
+        if cached_root not in roots_to_remove
+    ]
+
+    return _CACHED_ROOTS[:]
+
+def get_unique_roots_from_selection_for_cache():
+    return JOW_core.get_unique_roots_from_selection()
+
 def get_chain_center(joints):
     if not joints:
         return None
@@ -234,18 +315,47 @@ def build_preview_chain(root, settings):
     orientation_data = JOW_core.compute_chain_orientation(root, settings)
     for entry in orientation_data:
         preview_joint = PreviewJoint()
-
         preview_joint.name = entry.joint
-        preview_joint.matrix = entry.matrix
-        preview_joint.position = position_from_matrix(entry.matrix)
 
-        x_axis, y_axis, z_axis = axes_from_matrix(entry.matrix)
+        ##########################################################
+        # Current Maya orientation before Apply
+        ##########################################################
+        current_matrix = get_current_world_matrix(
+            entry.joint
+        )
+
+        preview_joint.current_matrix = current_matrix
+        preview_joint.current_position = position_from_matrix(
+            current_matrix
+        )
+
+        current_x_axis, current_y_axis, current_z_axis = axes_from_matrix(
+            current_matrix
+        )
+
+        preview_joint.current_x_axis = current_x_axis
+        preview_joint.current_y_axis = current_y_axis
+        preview_joint.current_z_axis = current_z_axis
+
+        ##########################################################
+        # Preview / proposed JOW orientation
+        ##########################################################
+        preview_joint.matrix = entry.matrix
+        preview_joint.position = position_from_matrix(
+            entry.matrix
+        )
+
+        x_axis, y_axis, z_axis = axes_from_matrix(
+            entry.matrix
+        )
 
         preview_joint.x_axis = x_axis
         preview_joint.y_axis = y_axis
         preview_joint.z_axis = z_axis
 
-        preview_chain.joints.append(preview_joint)
+        preview_chain.joints.append(
+            preview_joint
+        )
 
     return preview_chain
 

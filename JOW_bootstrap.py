@@ -49,6 +49,20 @@ MODULES_TO_RELOAD = [
 
     "JOW_ui.JOW_gl.JOW_guides",
     "JOW_ui.JOW_gl.JOW_preview",
+
+    "JOW_ui.JOW_widgets.JOW_widget_utils",
+    "JOW_ui.JOW_widgets.JOW_tool_panel",
+    "JOW_ui.JOW_widgets.JOW_cache_panel",
+    "JOW_ui.JOW_widgets.JOW_settings_panel",
+    "JOW_ui.JOW_widgets.JOW_action_bar",
+
+    "JOW_ui.JOW_drawables.JOW_grid_drawer",
+    "JOW_ui.JOW_drawables.JOW_axis_drawer",
+    "JOW_ui.JOW_drawables.JOW_joint_drawer",
+    "JOW_ui.JOW_drawables.JOW_guide_drawer",
+    "JOW_ui.JOW_drawables.JOW_plane_drawer",
+    "JOW_ui.JOW_drawables.JOW_overlay_drawer",
+
     "JOW_ui.JOW_viewport",
     "JOW_ui.JOW_ui",
 
