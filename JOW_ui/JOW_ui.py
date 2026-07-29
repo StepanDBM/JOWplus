@@ -515,12 +515,35 @@ class JOWWindow(QtWidgets.QDialog):
         self.refresh_cache_panel()
         self.refresh_preview()
 
+    def validate_viewport_selected_guide(self):
+        selected_guide = self.viewport.selected_guide
+
+        if not selected_guide:
+            return
+
+        if cmds.objExists(selected_guide):
+            return
+
+        self.viewport.set_selected_guide(None)
+
     def delete_guide(self):
+        guide_to_delete = JOW_guides.get_guide()
+        cached_custom_object = JOW_preview.get_cached_custom_object()
+
         JOW_guides.delete_guide()
 
-        self.set_warning("Guide deleted.")
+        if guide_to_delete and cached_custom_object == guide_to_delete:
+            JOW_preview.clear_cached_custom_object()
+
+        if self.viewport.selected_guide == guide_to_delete:
+            self.viewport.set_selected_guide(None)
+
         self.refresh_cache_panel()
-        self.refresh_preview()
+        self.refresh_preview(preserve_cache=True)
+        self.reset_live_sync_snapshot()
+
+        self.set_warning("Guide deleted.")
+        self.viewport.update()
 
     def pick_custom_object(self):
         custom_object = JOW_guides.get_selected_custom_object()
@@ -564,6 +587,7 @@ class JOWWindow(QtWidgets.QDialog):
             JOW_preview.set_cache_locked(self.cache_panel.is_cache_locked())
 
         try:
+            self.validate_viewport_selected_guide()
             settings = self.get_settings()
 
             if self.cache_panel.apply_cached():

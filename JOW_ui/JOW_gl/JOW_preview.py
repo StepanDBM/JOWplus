@@ -73,7 +73,9 @@ def is_cache_locked():
 
 
 def get_cached_custom_object():
-    return _CACHED_CUSTOM_OBJECT
+    custom_object, removed = validate_cached_custom_object()
+
+    return custom_object
 
 def get_invalid_cached_roots():
     invalid_roots = []
@@ -126,6 +128,25 @@ def clear_cached_roots():
     global _CACHED_ROOTS
 
     _CACHED_ROOTS = []
+
+def validate_cached_custom_object():
+    global _CACHED_CUSTOM_OBJECT
+
+    if not _CACHED_CUSTOM_OBJECT:
+        return None, False
+
+    if cmds.objExists(_CACHED_CUSTOM_OBJECT):
+        return _CACHED_CUSTOM_OBJECT, False
+
+    _CACHED_CUSTOM_OBJECT = None
+
+    return None, True
+
+
+def clear_cached_custom_object():
+    global _CACHED_CUSTOM_OBJECT
+
+    _CACHED_CUSTOM_OBJECT = None
 
 
 def update_cached_roots_from_selection():
