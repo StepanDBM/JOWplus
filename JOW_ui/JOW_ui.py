@@ -17,6 +17,13 @@ from JOW_ui.JOW_gl import JOW_guides
 from JOW_ui.JOW_gl import JOW_preview
 from JOW_core.JOW_data import OrientationSettings
 
+from JOW_core.JOW_maya import JOW_maya_nodes
+from JOW_core.JOW_maya import JOW_maya_joints
+from JOW_core.JOW_maya import JOW_maya_selection
+from JOW_core.JOW_maya import JOW_maya_transforms
+from JOW_core.JOW_maya import JOW_maya_display
+from JOW_core.JOW_maya import JOW_maya_script_jobs
+
 from JOW_ui.JOW_widgets.JOW_tool_panel import JOWToolPanel
 from JOW_ui.JOW_widgets.JOW_cache_panel import JOWCachePanel
 from JOW_ui.JOW_widgets.JOW_settings_panel import JOWSettingsPanel
@@ -214,6 +221,19 @@ class JOWWindow(QtWidgets.QDialog):
 
         if self.cache_panel.apply_cached():
             settings.roots = JOW_preview.get_preview_roots()
+            roots_for_mapping = settings.roots
+        else:
+            roots_for_mapping = JOW_maya_joints.get_unique_roots_from_selection()
+
+        if settings.secondary_mode == "Custom Object":
+            settings.custom_object = JOW_preview.get_cached_custom_object()
+
+            settings.custom_objects_by_root = (
+                JOW_preview.get_custom_objects_by_root_for_roots(
+                    roots_for_mapping,
+                    fallback_custom_object=settings.custom_object
+                )
+            )
 
         return settings
 
@@ -266,10 +286,12 @@ class JOWWindow(QtWidgets.QDialog):
         removed_count = JOW_preview.validate_cache_and_get_removed_count()
         roots = JOW_preview.get_cached_roots()
         custom_object = JOW_preview.get_cached_custom_object()
+        guide_summary_text = JOW_preview.get_cached_guide_summary_text()
 
         self.cache_panel.update_cache_display(
             roots,
-            custom_object
+            custom_object,
+            guide_summary_text=guide_summary_text
         )
 
         if removed_count > 0:
@@ -303,7 +325,7 @@ class JOWWindow(QtWidgets.QDialog):
 
         self.viewport.set_preview_chains([])
         self.viewport.set_selected_joint(None)
-        self.viewport.set_selected_guide(None)
+        self.viewport.set_selected_guides([])
 
         self.live_sync_snapshot = {}
 
@@ -369,7 +391,7 @@ class JOWWindow(QtWidgets.QDialog):
 
         cmds.select(root,r=True)
         self.viewport.set_selected_joint(root)
-        self.viewport.set_selected_guide(None)
+        self.viewport.set_selected_guides([])
 
         self.sync_viewport_selection_from_maya()
         self.update_set_cache_button_state()
@@ -485,84 +507,222 @@ class JOWWindow(QtWidgets.QDialog):
     ##########################################################
 
     def create_guide(self):
-        guide = JOW_guides.create_guide()
+        selected_roots = self.get_selected_roots_for_guide_action()
 
-        if guide:
-            cmds.select(guide,r=True)
+        if selected_roots:
+            created_guides = []
 
-            JOW_preview.update_cached_custom_object_from_selection()
-            self.viewport.set_selected_guide(guide)
-            self.viewport.set_selected_joint(None)
+            for root in selected_roots:
+                position = self.get_chain_center_for_root(root)
 
-        self.refresh_cache_panel()
-        self.refresh_preview()
-        self.reset_live_sync_snapshot()
+                guide = JOW_guides.create_guide_for_root(root, position=position)
 
-    def select_guide(self):
-        guide = JOW_guides.select_guide()
+                if not guide:
+                    continue
 
-        if guide:
-            JOW_preview.update_cached_custom_object_from_selection()
-            self.viewport.set_selected_guide(guide)
+                JOW_preview.set_cached_guide_for_root(root, guide)
+
+                created_guides.append(guide)
+
+            if not created_guides:
+                self.set_warning("No guide was created.")
+                return
+
+            JOW_maya_selection.select_nodes(created_guides, replace=True)
+
+            self.viewport.set_selected_guide(created_guides[-1])
             self.viewport.set_selected_joint(None)
 
             self.set_warning(
-                "Guide selected: {}".format(
-                    guide.split("|")[-1]
+                "Created {} per-chain guide(s).".format(len(created_guides))
+            )
+
+        else:
+            cached_roots = self.get_cached_roots_for_guide_action()
+            target_roots = JOW_preview.get_roots_without_per_root_guides(cached_roots)
+
+            if not cached_roots:
+                self.set_warning("Select a joint or cache one or more chains before creating a guide.")
+                return
+
+            if not target_roots:
+                self.set_warning("All cached roots already have per-chain guides.")
+                return
+
+            position = self.get_average_center_for_roots(target_roots)
+
+            guide = JOW_guides.create_shared_guide(position=position)
+
+            JOW_preview.set_cached_custom_object(guide)
+
+            JOW_maya_selection.select_node(guide, replace=True)
+
+            self.viewport.set_selected_joint(None)
+            self.viewport.set_selected_guide(guide)
+
+            self.set_warning(
+                "Created shared guide for {} unguided cached root(s).".format(
+                    len(target_roots)
                 )
             )
 
         self.refresh_cache_panel()
-        self.refresh_preview()
+        self.refresh_preview(preserve_cache=True)
+        self.reset_live_sync_snapshot()
+
+    def select_guide(self):
+        selected_roots = self.get_selected_roots_for_guide_action()
+        guides = []
+
+        if selected_roots:
+            for root in selected_roots:
+                guide = JOW_preview.get_cached_guide_for_root(root)
+                if not guide:
+                    continue
+                if guide in guides:
+                    continue
+
+                guides.append(guide)
+        else:
+            guides = JOW_guides.get_all_guides()
+
+        selected_guides = JOW_guides.select_guides(guides)
+
+        if not selected_guides:
+            self.set_warning("No cached guide found for the current selection.")
+            return
+
+        self.viewport.set_selected_joint(None)
+        self.viewport.set_selected_guides(selected_guides)
+
+        self.refresh_cache_panel()
+        self.refresh_preview(preserve_cache=True)
+
+        self.set_warning("Selected {} guide(s).".format(len(selected_guides)))
 
     def validate_viewport_selected_guide(self):
         selected_guide = self.viewport.selected_guide
 
         if not selected_guide:
             return
-
         if cmds.objExists(selected_guide):
             return
 
         self.viewport.set_selected_guide(None)
 
     def delete_guide(self):
-        guide_to_delete = JOW_guides.get_guide()
-        cached_custom_object = JOW_preview.get_cached_custom_object()
+        guides_to_delete = JOW_guides.get_selected_guides()
 
-        JOW_guides.delete_guide()
+        if not guides_to_delete:
+            guides_to_delete = JOW_guides.get_all_guides()
+        if not guides_to_delete:
+            self.set_warning("No JOW guide locator exists.")
+            return
 
-        if guide_to_delete and cached_custom_object == guide_to_delete:
-            JOW_preview.clear_cached_custom_object()
-
-        if self.viewport.selected_guide == guide_to_delete:
-            self.viewport.set_selected_guide(None)
+        JOW_preview.clear_cached_guides_for_guides(guides_to_delete)
+        deleted_guides = JOW_guides.delete_guides(guides_to_delete)
+        self.clear_deleted_guides_from_viewport(deleted_guides)
 
         self.refresh_cache_panel()
         self.refresh_preview(preserve_cache=True)
         self.reset_live_sync_snapshot()
 
-        self.set_warning("Guide deleted.")
+        self.set_warning("Deleted {} guide(s).".format(len(deleted_guides)))
+
         self.viewport.update()
 
     def pick_custom_object(self):
         custom_object = JOW_guides.get_selected_custom_object()
 
         if not custom_object:
-            self.set_warning("Select a non-joint object to use as Custom Object guide.")
+            self.set_warning(
+                "Select a non-joint object to use as Custom Object guide."
+            )
             return
 
-        JOW_preview.update_cached_custom_object_from_selection()
+        selected_roots = self.get_selected_roots_for_guide_action()
 
-        self.set_warning(
-            "Custom Object picked: {}".format(
-                custom_object.split("|")[-1]
+        if selected_roots:
+            for root in selected_roots:
+                JOW_preview.set_cached_guide_for_root(root,custom_object)
+
+            self.set_warning(
+                "Custom Object assigned to {} selected chain(s): {}".format(
+                    len(selected_roots),
+                    custom_object.split("|")[-1]
+                )
             )
-        )
+
+        else:
+            JOW_preview.set_cached_custom_object(custom_object)
+
+            self.set_warning(
+                "Custom Object picked as shared guide: {}".format(
+                    custom_object.split("|")[-1]
+                )
+            )
 
         self.refresh_cache_panel()
-        self.refresh_preview()
+        self.refresh_preview(preserve_cache=True)
         self.reset_live_sync_snapshot()
+
+    def get_selected_roots_for_guide_action(self):
+        return JOW_maya_joints.get_unique_roots_from_selection()
+
+    def get_cached_roots_for_guide_action(self):
+        return JOW_preview.get_cached_roots()
+
+    def get_chain_center_for_root(self, root):
+        joints = JOW_maya_joints.get_chain_joints(root)
+
+        return JOW_preview.get_chain_center(joints)
+
+    def get_average_center_for_roots(self, roots):
+        centers = []
+
+        for root in roots or []:
+            center = self.get_chain_center_for_root(root)
+
+            if center is None:
+                continue
+
+            centers.append(center)
+
+        if not centers:
+            return None
+
+        result = JOW_maya_transforms.vector_from_position([0, 0, 0])
+
+        for center in centers:
+            result += center
+
+        result /= len(centers)
+
+        return result
+
+    def clear_deleted_guides_from_viewport(self, deleted_guides):
+        selected_guides = getattr(
+            self.viewport,
+            "selected_guides",
+            []
+        )
+
+        remaining_guides = []
+        for selected_guide in selected_guides:
+            should_remove = False
+            for deleted_guide in deleted_guides or []:
+                if JOW_preview.nodes_match(
+                    selected_guide,
+                    deleted_guide
+                ):
+                    should_remove = True
+                    break
+
+            if should_remove:
+                continue
+
+            remaining_guides.append(selected_guide)
+        self.viewport.set_selected_guides(remaining_guides)
 
     ##########################################################
     # Preview / Apply
@@ -595,48 +755,33 @@ class JOWWindow(QtWidgets.QDialog):
             else:
                 apply_target_label = "Selection"
 
-            self.viewport.set_overlay_context(
-                settings,
-                apply_target_label
-            )
+            self.viewport.set_overlay_context(settings, apply_target_label)
 
             preview_chains = JOW_preview.build_preview_chains(settings)
 
-            if (
+            custom_object_missing = (
                 settings.secondary_mode == "Custom Object" and
-                not settings.custom_object
-            ):
-                self.set_warning(
-                    "Custom Object mode needs a valid non-joint guide object."
-                )
+                not JOW_preview.preview_chains_have_guides(preview_chains)
+            )
+
+            if custom_object_missing:
+                self.set_warning("Custom Object mode needs a valid non-joint guide object.")
+
             self.viewport.set_secondary_mode(settings.secondary_mode)
-            self.viewport.set_show_joint_names(self.settings_panel.show_joint_names()            )
+            self.viewport.set_show_joint_names(self.settings_panel.show_joint_names())
             self.viewport.set_preview_chains(preview_chains)
 
             self.sync_viewport_selection_from_maya()
             self.refresh_cache_panel()
 
             if not preview_chains:
-                self.set_warning(
-                    "No valid cached or selected joint chains found."
-                )
+                self.set_warning("No valid cached or selected joint chains found.")
 
-            elif (
-                settings.secondary_mode == "Custom Object" and
-                not settings.custom_object
-            ):
-                self.set_warning(
-                    "Custom Object mode needs a valid non-joint guide object."
-                )
+            elif custom_object_missing:
+                self.set_warning("Custom Object mode needs a valid non-joint guide object.")
 
             else:
                 self.clear_warning()
-
-            print(
-                "JOW preview refreshed:",
-                len(preview_chains),
-                "chain(s)"
-            )
 
             self.focus_viewport()
 
@@ -680,7 +825,7 @@ class JOWWindow(QtWidgets.QDialog):
             cmds.select(joint_name, r=True)
 
             self.viewport.set_selected_joint(joint_name)
-            self.viewport.set_selected_guide(None)
+            self.viewport.set_selected_guides([])
 
         finally:
             self._syncing_selection_from_viewport = False
@@ -695,21 +840,15 @@ class JOWWindow(QtWidgets.QDialog):
     def select_guide_from_viewport(self, guide_name):
         if not guide_name:
             return
-
-        if not cmds.objExists(guide_name):
+        if not JOW_maya_nodes.exists(guide_name):
             return
 
         self._syncing_selection_from_viewport = True
-
         try:
-            cmds.select(
-                guide_name,
-                r=True
-            )
+            JOW_maya_selection.select_node(guide_name, replace=True)
 
-            JOW_preview.update_cached_custom_object_from_selection()
-            self.viewport.set_selected_guide(guide_name)
             self.viewport.set_selected_joint(None)
+            self.viewport.set_selected_guides([guide_name])
 
         finally:
             self._syncing_selection_from_viewport = False
@@ -717,16 +856,8 @@ class JOWWindow(QtWidgets.QDialog):
         self.refresh_cache_panel()
         self.update_set_cache_button_state()
 
-        self.set_warning(
-            "Guide selected from viewport: {}".format(
-                guide_name.split("|")[-1]
-            )
-        )
-
-        print(
-            "JOW viewport selected guide:",
-            guide_name
-        )
+        self.set_warning("Guide selected from viewport: {}".format(guide_name.split("|")[-1]))
+        print("JOW viewport selected guide:", guide_name)
 
     def clear_selection_from_viewport(self):
         self._syncing_selection_from_viewport = True
@@ -736,13 +867,8 @@ class JOWWindow(QtWidgets.QDialog):
                 clear=True
             )
 
-            self.viewport.set_selected_joint(
-                None
-            )
-
-            self.viewport.set_selected_guide(
-                None
-            )
+            self.viewport.set_selected_joint(None)
+            self.viewport.set_selected_guides([])
 
         finally:
             self._syncing_selection_from_viewport = False
@@ -756,6 +882,9 @@ class JOWWindow(QtWidgets.QDialog):
     ##########################################################
     # Native Maya Selection Sync
     ##########################################################
+
+    def get_selected_maya_items(self):
+        return JOW_maya_selection.get_selection(long=True)
 
     def get_first_selected_maya_item(self):
         selected = cmds.ls(
@@ -782,7 +911,7 @@ class JOWWindow(QtWidgets.QDialog):
             if not chain.guide.name:
                 continue
 
-            if chain.guide.name == item:
+            if JOW_preview.nodes_match(chain.guide.name, item):
                 return True
 
         return False
@@ -802,25 +931,51 @@ class JOWWindow(QtWidgets.QDialog):
         return False
 
     def sync_viewport_selection_from_maya(self):
-        selected_item = self.get_first_selected_maya_item()
+        selected_items = cmds.ls(
+            sl=True,
+            long=True
+        ) or []
 
-        if not selected_item:
+        if not selected_items:
             self.viewport.set_selected_joint(None)
-            self.viewport.set_selected_guide(None)
+            self.viewport.set_selected_guides([])
             return
 
-        if self.maya_item_is_preview_joint(selected_item):
-            self.viewport.set_selected_joint(selected_item)
-            self.viewport.set_selected_guide(None)
+        selected_guides = []
+
+        for item in selected_items:
+            for chain in self.viewport.preview_chains:
+                if not chain.guide:
+                    continue
+
+                if not chain.guide.name:
+                    continue
+
+                if not JOW_preview.nodes_match(
+                    chain.guide.name,
+                    item
+                ):
+                    continue
+
+                if chain.guide.name not in selected_guides:
+                    selected_guides.append(chain.guide.name)
+                break
+
+        if selected_guides:
+            self.viewport.set_selected_joint(None)
+            self.viewport.set_selected_guides(selected_guides)
             return
 
-        if self.maya_item_is_preview_guide(selected_item):
-            self.viewport.set_selected_guide(selected_item)
-            self.viewport.set_selected_joint(None)
+        for item in selected_items:
+            if not self.maya_item_is_preview_joint(item):
+                continue
+
+            self.viewport.set_selected_guides([])
+            self.viewport.set_selected_joint(item)
             return
 
         self.viewport.set_selected_joint(None)
-        self.viewport.set_selected_guide(None)
+        self.viewport.set_selected_guides([])
 
     ##########################################################
     # Native Maya Viewport Live Sync
@@ -865,88 +1020,47 @@ class JOWWindow(QtWidgets.QDialog):
 
         roots = JOW_preview.get_cached_roots()
 
-        for root in roots:
-            if not cmds.objExists(root):
+        cached_joints = JOW_maya_joints.get_unique_joint_chains_from_roots(roots)
+
+        for joint in cached_joints:
+            if joint in nodes:
                 continue
 
-            joints = JOW_core.get_chain_joints(
-                root
-            )
+            nodes.append(joint)
 
-            for joint in joints:
-                if not cmds.objExists(joint):
-                    continue
+        guides_by_root = JOW_preview.get_cached_guides_by_root()
 
-                if joint not in nodes:
-                    nodes.append(
-                        joint
-                    )
+        for guide in guides_by_root.values():
+            if not JOW_maya_nodes.exists(guide):
+                continue
+
+            if guide in nodes:
+                continue
+
+            nodes.append(guide)
 
         custom_object = JOW_preview.get_cached_custom_object()
 
-        if custom_object and cmds.objExists(custom_object):
+        if custom_object and JOW_maya_nodes.exists(custom_object):
             if custom_object not in nodes:
-                nodes.append(
-                    custom_object
-                )
+                nodes.append(custom_object)
 
         return nodes
 
-    def get_world_matrix_snapshot(self):
-        snapshot = {}
-
-        nodes = self.get_live_sync_nodes()
-
-        for node in nodes:
-            if not cmds.objExists(node):
-                continue
-
-            try:
-                matrix = cmds.xform(
-                    node,
-                    q=True,
-                    ws=True,
-                    matrix=True
-                )
-
-            except Exception:
-                continue
-
-            snapshot[node] = matrix
-
-        return snapshot
+    def get_world_matrix_snapshot(self):#wrapper
+        return JOW_maya_transforms.get_world_matrix_snapshot(
+            self.get_live_sync_nodes()
+        )
 
     def reset_live_sync_snapshot(self):
         self.live_sync_snapshot = self.get_world_matrix_snapshot()
 
-    def matrices_are_different(self, matrix_a, matrix_b):
-        if matrix_a is None or matrix_b is None:
-            return True
-
-        if len(matrix_a) != len(matrix_b):
-            return True
-
-        for a, b in zip(matrix_a, matrix_b):
-            if abs(a - b) > self.live_sync_tolerance:
-                return True
-
-        return False
-
     def snapshots_are_different(self, snapshot_a, snapshot_b):
-        if set(snapshot_a.keys()) != set(snapshot_b.keys()):
-            return True
-
-        for node in snapshot_a:
-            matrix_a = snapshot_a.get(node)
-            matrix_b = snapshot_b.get(node)
-
-            if self.matrices_are_different(
-                matrix_a,
-                matrix_b
-            ):
-                return True
-
-        return False
+        return JOW_maya_transforms.snapshots_are_different(
+            snapshot_a,
+            snapshot_b,
+            tolerance=self.live_sync_tolerance
+        )
 
     def check_live_sync_matrix_changes(self):
         if self._live_sync_refreshing:
@@ -957,9 +1071,10 @@ class JOWWindow(QtWidgets.QDialog):
 
         new_snapshot = self.get_world_matrix_snapshot()
 
-        if not self.snapshots_are_different(
+        if not JOW_maya_transforms.snapshots_are_different(
             self.live_sync_snapshot,
-            new_snapshot
+            new_snapshot,
+            self.live_sync_tolerance
         ):
             return
 

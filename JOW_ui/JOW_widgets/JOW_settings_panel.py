@@ -61,21 +61,10 @@ class JOWSettingsPanel(QtWidgets.QWidget):
             minimum_width=82
         )
 
-        self.viewport_controls_layout.addWidget(
-            self.show_overlay_checkbox
-        )
-
-        self.viewport_controls_layout.addWidget(
-            self.show_delta_heatmap_checkbox
-        )
-
-        self.viewport_controls_layout.addWidget(
-            self.live_sync_checkbox
-        )
-
-        self.viewport_controls_layout.addWidget(
-            QtWidgets.QLabel("Projection")
-        )
+        self.viewport_controls_layout.addWidget(self.show_overlay_checkbox)
+        self.viewport_controls_layout.addWidget(self.show_delta_heatmap_checkbox)
+        self.viewport_controls_layout.addWidget(self.live_sync_checkbox)
+        self.viewport_controls_layout.addWidget(QtWidgets.QLabel("Projection"))
 
         self.projection_combo = QtWidgets.QComboBox()
         self.projection_combo.addItems(["Orbit", "XY", "XZ", "ZY"])

@@ -156,7 +156,8 @@ class JOWCachePanel(QtWidgets.QWidget):
     def update_cache_display(
         self,
         roots,
-        custom_object
+        custom_object,
+        guide_summary_text=None
     ):
         selected_roots = set(self.selected_cached_roots())
 
@@ -186,12 +187,16 @@ class JOWCachePanel(QtWidgets.QWidget):
 
         self.cached_root_list.blockSignals(False)
 
-        if custom_object:
+        if guide_summary_text:
+            self.cached_guide_label.setText(guide_summary_text)
+
+        elif custom_object:
             self.cached_guide_label.setText(
                 "Guide: {}".format(
                     custom_object.split("|")[-1]
                 )
             )
+
         else:
             self.cached_guide_label.setText("Guide: None")
 

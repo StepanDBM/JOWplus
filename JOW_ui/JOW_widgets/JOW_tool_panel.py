@@ -98,7 +98,7 @@ class JOWToolPanel(QtWidgets.QWidget):
         )
 
         self.delete_guide_btn = create_action_button(
-            "Delete Guide",
+            "Delete Guide(s)",
             minimum_width=100
         )
 

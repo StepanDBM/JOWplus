@@ -1,6 +1,14 @@
+import copy
+
 import JOW_core.JOW_math as JOW_math
+
 from JOW_core import JOW_core
-import maya.cmds as cmds
+
+from JOW_core.JOW_maya import JOW_maya_nodes
+from JOW_core.JOW_maya import JOW_maya_joints
+from JOW_core.JOW_maya import JOW_maya_selection
+from JOW_core.JOW_maya import JOW_maya_transforms
+
 
 class PreviewJoint:
     def __init__(self):
@@ -20,6 +28,7 @@ class PreviewJoint:
         self.current_z_axis = None
         self.current_matrix = None
 
+
 class PreviewChain:
     def __init__(self):
         self.root = None
@@ -29,10 +38,12 @@ class PreviewChain:
         self.previous_normals = []
         self.guide = None
 
+
 class PreviewNormal:
     def __init__(self):
         self.position = None
         self.normal = None
+
 
 class PreviewGuide:
     def __init__(self):
@@ -40,27 +51,23 @@ class PreviewGuide:
         self.position = None
 
 
-
 _CACHED_ROOTS = []
 _CACHED_CUSTOM_OBJECT = None
+_CACHED_GUIDES_BY_ROOT = {}
 
 _CACHE_LOCKED = False
 
-def get_current_world_matrix(joint):
-    return cmds.xform(
-        joint,
-        q=True,
-        ws=True,
-        matrix=True
-    )
-
 def get_cached_roots():
     roots, removed_count = validate_cached_roots()
+
     return roots
+
 
 def validate_cache_and_get_removed_count():
     roots, removed_count = validate_cached_roots()
+
     return removed_count
+
 
 def set_cache_locked(state):
     global _CACHE_LOCKED
@@ -77,57 +84,76 @@ def get_cached_custom_object():
 
     return custom_object
 
+
 def get_invalid_cached_roots():
     invalid_roots = []
 
     for root in _CACHED_ROOTS:
-        if not cmds.objExists(root):
+        if not JOW_maya_nodes.exists(root):
             invalid_roots.append(root)
 
     return invalid_roots
 
+
 def clear_cache():
     global _CACHED_ROOTS
     global _CACHED_CUSTOM_OBJECT
+    global _CACHED_GUIDES_BY_ROOT
 
     _CACHED_ROOTS = []
     _CACHED_CUSTOM_OBJECT = None
+    _CACHED_GUIDES_BY_ROOT = {}
+
 
 def validate_cached_roots():
     global _CACHED_ROOTS
+    global _CACHED_GUIDES_BY_ROOT
 
     valid_roots = []
 
     for root in _CACHED_ROOTS:
-        if cmds.objExists(root):
+        if JOW_maya_nodes.exists(root):
             valid_roots.append(root)
 
     removed_count = len(_CACHED_ROOTS) - len(valid_roots)
 
     _CACHED_ROOTS = valid_roots
 
+    valid_root_set = set(_CACHED_ROOTS)
+
+    _CACHED_GUIDES_BY_ROOT = {
+        root: guide
+        for root, guide in _CACHED_GUIDES_BY_ROOT.items()
+        if root in valid_root_set
+    }
+
+    validate_cached_guides()
+
     return _CACHED_ROOTS[:], removed_count
+
 
 def refresh_cache_from_selection():
     global _CACHED_ROOTS
     global _CACHED_CUSTOM_OBJECT
 
-    roots = JOW_core.get_unique_roots_from_selection()
+    roots = JOW_maya_joints.get_unique_roots_from_selection()
 
     if roots:
         _CACHED_ROOTS = roots[:]
 
-    custom_object = JOW_core.get_custom_object_from_selection()
+    custom_object = JOW_maya_selection.get_selected_custom_object(long=True)
 
     if custom_object:
         _CACHED_CUSTOM_OBJECT = custom_object
 
     return _CACHED_ROOTS[:]
 
+
 def clear_cached_roots():
     global _CACHED_ROOTS
 
     _CACHED_ROOTS = []
+
 
 def validate_cached_custom_object():
     global _CACHED_CUSTOM_OBJECT
@@ -135,7 +161,7 @@ def validate_cached_custom_object():
     if not _CACHED_CUSTOM_OBJECT:
         return None, False
 
-    if cmds.objExists(_CACHED_CUSTOM_OBJECT):
+    if JOW_maya_nodes.exists(_CACHED_CUSTOM_OBJECT):
         return _CACHED_CUSTOM_OBJECT, False
 
     _CACHED_CUSTOM_OBJECT = None
@@ -151,9 +177,7 @@ def clear_cached_custom_object():
 
 def update_cached_roots_from_selection():
     global _CACHED_ROOTS
-
-    roots = JOW_core.get_unique_roots_from_selection()
-
+    roots = JOW_maya_joints.get_unique_roots_from_selection()
     if roots:
         _CACHED_ROOTS = roots[:]
 
@@ -162,9 +186,7 @@ def update_cached_roots_from_selection():
 
 def update_cached_custom_object_from_selection():
     global _CACHED_CUSTOM_OBJECT
-
-    custom_object = JOW_core.get_custom_object_from_selection()
-
+    custom_object = JOW_maya_selection.get_selected_custom_object(long=True)
     if custom_object:
         _CACHED_CUSTOM_OBJECT = custom_object
 
@@ -172,13 +194,12 @@ def update_cached_custom_object_from_selection():
 
 
 def get_preview_roots():
+    global _CACHED_ROOTS
     if _CACHE_LOCKED:
         return get_cached_roots()
 
-    roots = JOW_core.get_unique_roots_from_selection()
-
+    roots = JOW_maya_joints.get_unique_roots_from_selection()
     if roots:
-        global _CACHED_ROOTS
         _CACHED_ROOTS = roots[:]
         return roots
 
@@ -186,54 +207,46 @@ def get_preview_roots():
 
 
 def get_preview_custom_object(settings):
-    global _CACHED_CUSTOM_OBJECT
-
-    custom_object = JOW_core.get_custom_object_from_selection()
-
-    if custom_object:
-        _CACHED_CUSTOM_OBJECT = custom_object
-        return custom_object
-
     if settings.custom_object:
         return settings.custom_object
 
-    return _CACHED_CUSTOM_OBJECT
+    return get_cached_custom_object()
+
 
 def set_cached_roots(roots):
     global _CACHED_ROOTS
-
     clean_roots = []
-
-    for root in roots:
+    for root in roots or []:
         if not root:
             continue
-
-        if not cmds.objExists(root):
+        if not JOW_maya_nodes.exists(root):
             continue
 
         if root not in clean_roots:
             clean_roots.append(root)
 
     _CACHED_ROOTS = clean_roots[:]
+    validate_cached_guides()
 
     return _CACHED_ROOTS[:]
 
+
 def add_roots_to_cache(roots):
     global _CACHED_ROOTS
-
     validate_cached_roots()
 
-    for root in roots:
+    for root in roots or []:
         if not root:
             continue
 
-        if not cmds.objExists(root):
+        if not JOW_maya_nodes.exists(root):
             continue
 
         if root not in _CACHED_ROOTS:
             _CACHED_ROOTS.append(root)
 
     return _CACHED_ROOTS[:]
+
 
 def remove_cached_root(root):
     global _CACHED_ROOTS
@@ -246,7 +259,10 @@ def remove_cached_root(root):
         if cached_root != root
     ]
 
+    clear_cached_guide_for_root(root)
+
     return _CACHED_ROOTS[:]
+
 
 def remove_cached_roots(roots):
     global _CACHED_ROOTS
@@ -258,23 +274,252 @@ def remove_cached_roots(roots):
         if cached_root not in roots_to_remove
     ]
 
+    for root in roots_to_remove:
+        clear_cached_guide_for_root(root)
+
     return _CACHED_ROOTS[:]
 
+
+
 def get_unique_roots_from_selection_for_cache():
-    return JOW_core.get_unique_roots_from_selection()
+    return JOW_maya_joints.get_unique_roots_from_selection()
+
+def nodes_match(node_a, node_b):
+    if not node_a or not node_b:
+        return False
+
+    if node_a == node_b:
+        return True
+
+    return (
+        JOW_maya_nodes.short_name(node_a) ==
+        JOW_maya_nodes.short_name(node_b)
+    )
+
+
+def get_cached_guides_by_root():
+    validate_cached_guides()
+
+    return dict(_CACHED_GUIDES_BY_ROOT)
+
+
+def get_cached_guide_for_root(root):
+    validate_cached_guides()
+
+    guide = _CACHED_GUIDES_BY_ROOT.get(root)
+
+    if guide and JOW_maya_nodes.exists(guide):
+        return guide
+
+    return None
+
+
+def root_has_cached_guide(root):
+    return bool(
+        get_cached_guide_for_root(root)
+    )
+
+
+def set_cached_guide_for_root(root, guide):
+    global _CACHED_GUIDES_BY_ROOT
+    global _CACHED_CUSTOM_OBJECT
+
+    if not root:
+        return
+
+    if not guide:
+        return
+
+    if not JOW_maya_nodes.exists(root):
+        return
+
+    if not JOW_maya_nodes.exists(guide):
+        return
+
+    _CACHED_GUIDES_BY_ROOT[root] = guide
+
+    if nodes_match(_CACHED_CUSTOM_OBJECT, guide):
+        _CACHED_CUSTOM_OBJECT = None
+
+
+def set_cached_custom_object(custom_object):
+    global _CACHED_CUSTOM_OBJECT
+
+    if not custom_object:
+        return
+
+    if not JOW_maya_nodes.exists(custom_object):
+        return
+
+    _CACHED_CUSTOM_OBJECT = custom_object
+
+
+def clear_cached_guides():
+    global _CACHED_GUIDES_BY_ROOT
+
+    _CACHED_GUIDES_BY_ROOT = {}
+
+
+def clear_cached_guide_for_root(root):
+    global _CACHED_GUIDES_BY_ROOT
+
+    if root in _CACHED_GUIDES_BY_ROOT:
+        del _CACHED_GUIDES_BY_ROOT[root]
+
+
+def clear_cached_guides_for_guides(guides):
+    global _CACHED_GUIDES_BY_ROOT
+    global _CACHED_CUSTOM_OBJECT
+
+    guides = guides or []
+    new_guides_by_root = {}
+
+    for root, guide in _CACHED_GUIDES_BY_ROOT.items():
+        remove_guide = False
+
+        for deleted_guide in guides:
+            if nodes_match(guide, deleted_guide):
+                remove_guide = True
+                break
+
+        if remove_guide:
+            continue
+
+        new_guides_by_root[root] = guide
+
+    _CACHED_GUIDES_BY_ROOT = new_guides_by_root
+
+    for deleted_guide in guides:
+        if nodes_match(_CACHED_CUSTOM_OBJECT, deleted_guide):
+            _CACHED_CUSTOM_OBJECT = None
+            break
+
+
+def validate_cached_guides():
+    global _CACHED_GUIDES_BY_ROOT
+
+    valid_guides = {}
+
+    for root, guide in _CACHED_GUIDES_BY_ROOT.items():
+        if not JOW_maya_nodes.exists(root):
+            continue
+
+        if not JOW_maya_nodes.exists(guide):
+            continue
+
+        valid_guides[root] = guide
+
+    _CACHED_GUIDES_BY_ROOT = valid_guides
+
+    return dict(_CACHED_GUIDES_BY_ROOT)
+
+
+def get_roots_without_per_root_guides(roots):
+    result = []
+
+    for root in roots or []:
+        if root_has_cached_guide(root):
+            continue
+
+        result.append(root)
+
+    return result
+
+
+def get_effective_custom_object_for_root(root, fallback_custom_object=None):
+    guide = get_cached_guide_for_root(root)
+
+    if guide:
+        return guide
+
+    if fallback_custom_object and JOW_maya_nodes.exists(fallback_custom_object):
+        return fallback_custom_object
+
+    return get_cached_custom_object()
+
+
+def get_custom_objects_by_root_for_roots(roots, fallback_custom_object=None):
+    result = {}
+
+    for root in roots or []:
+        custom_object = get_effective_custom_object_for_root(
+            root,
+            fallback_custom_object=fallback_custom_object
+        )
+
+        if not custom_object:
+            continue
+
+        result[root] = custom_object
+
+    return result
+
+def preview_chains_have_guides(preview_chains):
+    for chain in preview_chains or []:
+        if not chain.guide:
+            return False
+
+        if not chain.guide.name:
+            return False
+
+    return bool(preview_chains)
+
+def get_cached_guide_summary_text():
+    validate_cached_guides()
+
+    guide_names = []
+
+    for guide in _CACHED_GUIDES_BY_ROOT.values():
+        if not JOW_maya_nodes.exists(guide):
+            continue
+
+        short_name = JOW_maya_nodes.short_name(guide)
+
+        if short_name in guide_names:
+            continue
+
+        guide_names.append(short_name)
+
+    custom_object = get_cached_custom_object()
+
+    if custom_object:
+        short_name = JOW_maya_nodes.short_name(custom_object)
+
+        if short_name not in guide_names:
+            guide_names.append(short_name)
+
+    if not guide_names:
+        return "Guide: None"
+
+    if len(guide_names) == 1:
+        return "Guide: {}".format(guide_names[0])
+
+    return "Guides: {}".format(len(guide_names))
+
 
 def get_chain_center(joints):
     if not joints:
         return None
 
     center = JOW_math.vec_from_pos([0, 0, 0])
+    valid_count = 0
 
-    for jnt in joints:
-        center += JOW_math.get_world_pos(jnt)
+    for joint in joints:
+        position = JOW_maya_transforms.get_world_position(joint)
 
-    center /= len(joints)
+        if position is None:
+            continue
+
+        center += position
+        valid_count += 1
+
+    if valid_count == 0:
+        return None
+
+    center /= valid_count
 
     return center
+
 
 def axes_from_matrix(matrix):
     x_axis = JOW_math.safe_normalize(
@@ -315,9 +560,7 @@ def position_from_matrix(matrix):
 def build_preview_chain(root, settings):
     preview_chain = PreviewChain()
     preview_chain.root = root
-
-    joints = JOW_core.get_chain_joints(root)
-
+    joints = JOW_maya_joints.get_chain_joints(root)
     preview_chain.curve_plane_center = get_chain_center(joints)
 
     preview_chain.curve_plane_normal = JOW_math.compute_curve_plane_normal(
@@ -331,24 +574,36 @@ def build_preview_chain(root, settings):
         preview_chain.curve_plane_normal
     )
 
-    preview_chain.guide = build_preview_guide(settings)
+    root_settings = copy.copy(settings)
+    root_settings.custom_object = get_effective_custom_object_for_root(
+        root,
+        fallback_custom_object=settings.custom_object
+    )
 
-    orientation_data = JOW_core.compute_chain_orientation(root, settings)
+    preview_chain.guide = build_preview_guide(
+        root,
+        root_settings
+    )
+
+    orientation_data = JOW_core.compute_chain_orientation(
+        root,
+        root_settings
+    )
+
     for entry in orientation_data:
+        current_matrix = JOW_maya_transforms.get_world_matrix(entry.joint)
+
+        if current_matrix is None:
+            continue
+
         preview_joint = PreviewJoint()
         preview_joint.name = entry.joint
 
         ##########################################################
         # Current Maya orientation before Apply
         ##########################################################
-        current_matrix = get_current_world_matrix(
-            entry.joint
-        )
-
         preview_joint.current_matrix = current_matrix
-        preview_joint.current_position = position_from_matrix(
-            current_matrix
-        )
+        preview_joint.current_position = position_from_matrix(current_matrix)
 
         current_x_axis, current_y_axis, current_z_axis = axes_from_matrix(
             current_matrix
@@ -362,41 +617,33 @@ def build_preview_chain(root, settings):
         # Preview / proposed JOW orientation
         ##########################################################
         preview_joint.matrix = entry.matrix
-        preview_joint.position = position_from_matrix(
-            entry.matrix
-        )
+        preview_joint.position = position_from_matrix(entry.matrix)
 
-        x_axis, y_axis, z_axis = axes_from_matrix(
-            entry.matrix
-        )
+        x_axis, y_axis, z_axis = axes_from_matrix(entry.matrix)
 
         preview_joint.x_axis = x_axis
         preview_joint.y_axis = y_axis
         preview_joint.z_axis = z_axis
 
-        preview_chain.joints.append(
-            preview_joint
-        )
+        preview_chain.joints.append(preview_joint)
 
     return preview_chain
 
 
 def build_preview_chains(settings):
     preview_chains = []
-
     roots = get_preview_roots()
-
     if not roots:
         return preview_chains
 
     if settings.custom_object is None:
-        settings.custom_object = get_preview_custom_object(settings)
-
+        settings.custom_object = get_cached_custom_object()
     for root in roots:
         preview_chain = build_preview_chain(root, settings)
         preview_chains.append(preview_chain)
 
     return preview_chains
+
 
 def build_previous_normals(joints, curve_plane_normal):
     previous_normals = []
@@ -407,12 +654,15 @@ def build_previous_normals(joints, curve_plane_normal):
             i,
             curve_plane_normal
         )
+        if normal is None:
+            continue
+        position = JOW_maya_transforms.get_world_position(joints[i])
 
-        if not normal:
+        if position is None:
             continue
 
         preview_normal = PreviewNormal()
-        preview_normal.position = JOW_math.get_world_pos(joints[i])
+        preview_normal.position = position
         preview_normal.normal = normal
 
         previous_normals.append(preview_normal)
@@ -420,15 +670,25 @@ def build_previous_normals(joints, curve_plane_normal):
     return previous_normals
 
 
-def build_preview_guide(settings):
-    if not settings.custom_object:
+def build_preview_guide(root, settings):
+    guide_node = get_effective_custom_object_for_root(
+        root,
+        fallback_custom_object=settings.custom_object
+    )
+
+    if not guide_node:
         return None
 
-    if not cmds.objExists(settings.custom_object):
+    if not JOW_maya_nodes.exists(guide_node):
+        return None
+
+    position = JOW_maya_transforms.get_world_position(guide_node)
+
+    if position is None:
         return None
 
     guide = PreviewGuide()
-    guide.name = settings.custom_object
-    guide.position = JOW_math.get_world_pos(settings.custom_object)
+    guide.name = guide_node
+    guide.position = position
 
     return guide

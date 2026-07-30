@@ -47,6 +47,13 @@ MODULES_TO_RELOAD = [
     "JOW_core.JOW_presets",
     "JOW_core.JOW_core",
 
+    "JOW_core.JOW_maya.JOW_maya_nodes",
+    "JOW_core.JOW_maya.JOW_maya_selection",
+    "JOW_core.JOW_maya.JOW_maya_joints",
+    "JOW_core.JOW_maya.JOW_maya_transforms",
+    "JOW_core.JOW_maya.JOW_maya_display",
+    "JOW_core.JOW_maya.JOW_maya_script_jobs",
+
     "JOW_ui.JOW_gl.JOW_guides",
     "JOW_ui.JOW_gl.JOW_preview",
 

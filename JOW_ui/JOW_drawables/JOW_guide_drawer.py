@@ -5,6 +5,7 @@ except ImportError:
     from PySide6 import QtCore
     from PySide6 import QtGui
 
+from JOW_ui.JOW_gl import JOW_preview
 
 class JOWGuideDrawer:
 
@@ -20,15 +21,7 @@ class JOWGuideDrawer:
 
         if chain.guide.position is None:
             return
-
-        is_selected = (
-            chain.guide.name == getattr(
-                self.viewport,
-                "selected_guide",
-                None
-            )
-        )
-
+        is_selected = self.is_guide_selected(chain.guide.name)
         guide_point = self.viewport.project_point(
             chain.guide.position,
             bounds,
@@ -83,15 +76,7 @@ class JOWGuideDrawer:
             scale,
             rect
         )
-
-        is_selected = (
-            chain.guide.name == getattr(
-                self.viewport,
-                "selected_guide",
-                None
-            )
-        )
-
+        is_selected = self.is_guide_selected(chain.guide.name)
         if is_selected:
             self.draw_selected_guide_marker(
                 painter,
@@ -234,3 +219,28 @@ class JOWGuideDrawer:
             return None
 
         return guide.name
+
+    def is_guide_selected(self, guide_name):
+        selected_guides = getattr(
+            self.viewport,
+            "selected_guides",
+            []
+        )
+
+        for selected_guide in selected_guides:
+            if JOW_preview.nodes_match(
+                guide_name,
+                selected_guide
+            ):
+                return True
+
+        selected_guide = getattr(
+            self.viewport,
+            "selected_guide",
+            None
+        )
+
+        return JOW_preview.nodes_match(
+            guide_name,
+            selected_guide
+        )

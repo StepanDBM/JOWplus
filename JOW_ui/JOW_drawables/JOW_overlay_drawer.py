@@ -447,6 +447,17 @@ class JOWOverlayDrawer:
         return None, None
 
     def get_selected_guide_short_name(self):
+        selected_guides = getattr(
+            self.viewport,
+            "selected_guides",
+            []
+        )
+
+        if len(selected_guides) > 1:
+            return "{} guides".format(
+                len(selected_guides)
+            )
+
         selected = getattr(
             self.viewport,
             "selected_guide",

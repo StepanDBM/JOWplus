@@ -1,19 +1,13 @@
 import maya.api.OpenMaya as om
 import maya.cmds as cmds
+from JOW_core.JOW_maya import JOW_maya_transforms
 
 def vec_from_pos(pos):
     return om.MVector(pos[0], pos[1], pos[2])
 
 
 def get_world_pos(node):
-    return vec_from_pos(
-        cmds.xform(
-            node,
-            q=True,
-            ws=True,
-            t=True
-        )
-    )
+    return vec_from_pos(JOW_maya_transforms.get_world_position(node))
 
 
 def axis_index(axis):
@@ -54,9 +48,7 @@ def make_orientation_matrix(position, forward, secondary_reference, primary_axis
     secondary_idx = axis_index(secondary_axis)
 
     if primary_idx == secondary_idx:
-        raise RuntimeError(
-            "Primary Axis and Secondary Axis cannot be the same."
-        )
+        raise RuntimeError("Primary Axis and Secondary Axis cannot be the same.")
 
     third_idx = remaining_axis(
         primary_idx,
@@ -71,14 +63,12 @@ def make_orientation_matrix(position, forward, secondary_reference, primary_axis
     secondary = secondary_reference - (secondary_reference * forward) * forward
 
     if secondary.length() < 0.0001:
-
         fallback = om.MVector(0, 1, 0)
 
         if abs(forward * fallback) > 0.95:
             fallback = om.MVector(1, 0, 0)
 
         secondary = fallback - (fallback * forward) * forward
-
     secondary = safe_normalize(secondary)
 
     axes = [None, None, None]
@@ -123,9 +113,9 @@ def compute_curve_plane_normal(joints, average_normals=True, flip_plane=False):
     normals = []
 
     for i in range(1, len(joints) - 1):
-        prev_pos = get_world_pos(joints[i - 1])
-        curr_pos = get_world_pos(joints[i])
-        next_pos = get_world_pos(joints[i + 1])
+        prev_pos = JOW_maya_transforms.get_world_position(joints[i - 1])
+        curr_pos = JOW_maya_transforms.get_world_position(joints[i])
+        next_pos = JOW_maya_transforms.get_world_position(joints[i + 1])
 
         a = curr_pos - prev_pos
         b = next_pos - curr_pos
@@ -171,7 +161,7 @@ def get_secondary_reference(
     custom_object
 ):
     jnt = joints[index]
-    jnt_pos = get_world_pos(jnt)
+    jnt_pos = JOW_maya_transforms.get_world_position(jnt)
 
     if mode == "World":
         return om.MVector(0, 1, 0)
@@ -187,14 +177,11 @@ def get_secondary_reference(
         return curve_plane_normal
 
     elif mode == "Custom Object":
-
         if not custom_object:
-            cmds.warning(
-                "Custom Object mode needs a non-joint object selected. Falling back to World mode."
-            )
+            #cmds.warning("Custom Object mode needs a non-joint object selected. Falling back to World mode.")
             return om.MVector(0, 1, 0)
 
-        obj_pos = get_world_pos(custom_object)
+        obj_pos = JOW_maya_transforms.get_world_position(custom_object)
 
         return obj_pos - jnt_pos
 
@@ -205,9 +192,9 @@ def get_previous_mode_up(joints, index, fallback_normal):
 
     if index > 0 and index < len(joints) - 1:
 
-        prev_pos = get_world_pos(joints[index - 1])
-        curr_pos = get_world_pos(joints[index])
-        next_pos = get_world_pos(joints[index + 1])
+        prev_pos = JOW_maya_transforms.get_world_position(joints[index - 1])
+        curr_pos = JOW_maya_transforms.get_world_position(joints[index])
+        next_pos = JOW_maya_transforms.get_world_position(joints[index + 1])
 
         a = curr_pos - prev_pos
         b = next_pos - curr_pos

@@ -1,4 +1,11 @@
 import maya.cmds as cmds
+import copy
+
+from JOW_core.JOW_maya import JOW_maya_joints
+from JOW_core.JOW_maya import JOW_maya_selection
+from JOW_core.JOW_maya import JOW_maya_transforms
+from JOW_core.JOW_maya import JOW_maya_nodes
+
 import JOW_core.JOW_math as JOW_math
 from JOW_core.JOW_data import JointOrientation
 from JOW_core.JOW_utils.JOW_undo import undo_chunk
@@ -9,41 +16,64 @@ def apply_orientation(settings):
     if settings.roots:
         roots = settings.roots
     else:
-        roots = get_unique_roots_from_selection()
-
+        roots = JOW_maya_joints.get_unique_roots_from_selection()
     roots = [
         root for root in roots
-        if cmds.objExists(root)
+        if JOW_maya_nodes.exists(root)
     ]
-
     if not roots:
         cmds.warning("Select one or more joints.")
-
         return
-
     if settings.primary_axis == settings.secondary_axis:
         cmds.warning("Primary Axis and Secondary Axis cannot be the same.")
-
         return
 
-    if settings.custom_object is None:
-        settings.custom_object = (get_custom_object_from_selection())
+    custom_objects_by_root = getattr(
+        settings,
+        "custom_objects_by_root",
+        {}
+    )
+
+    applied_count = 0
+    skipped_count = 0
 
     for root in roots:
-        orient_chain(
-            root,
-            settings
+        root_settings = copy.copy(settings)
+        if settings.secondary_mode == "Custom Object":
+            if root in custom_objects_by_root:
+                root_settings.custom_object = custom_objects_by_root[root]
+            elif settings.custom_object:
+                root_settings.custom_object = settings.custom_object
+            else:
+                skipped_count += 1
+                continue
+
+        orient_chain(root, root_settings)
+        applied_count += 1
+
+    if applied_count == 0:
+        cmds.warning(
+            "No chains were oriented. Custom Object mode needs a guide for at least one target chain."
+        )
+        return
+
+    if skipped_count:
+        cmds.warning(
+            "JOW orientation executed on {} chain(s). Skipped {} chain(s) without guide.".format(
+                applied_count,
+                skipped_count
+            )
+        )
+    else:
+        cmds.inViewMessage(
+            amg="JOW orientation executed",
+            pos="midCenter",
+            fade=True
         )
 
-    cmds.inViewMessage(
-        amg="JOW orientation executed",
-        pos="midCenter",
-        fade=True
-    )
 
 def get_top_joint(jnt):
     current = jnt
-
     while True:
         parent = cmds.listRelatives(
             current,
@@ -54,9 +84,7 @@ def get_top_joint(jnt):
 
         if not parent:
             break
-
         current = parent[0]
-
     return current
 
 
@@ -98,7 +126,7 @@ def get_unique_roots_from_selection():
 
     for jnt in joints:
 
-        root = get_top_joint(jnt)
+        root = JOW_maya_joints.get_top_joint(jnt)
 
         if root not in roots:
             roots.append(root)
@@ -133,15 +161,15 @@ def get_parent_joint(jnt):
 
 
 def get_forward_for_joint(joints, index, jnt):
-    child = get_first_child_joint(jnt)
-    jnt_pos = JOW_math.get_world_pos(jnt)
+    child = JOW_maya_joints.get_first_child_joint(jnt)
+    jnt_pos = JOW_maya_transforms.get_world_position(jnt)
 
     if child:
-        child_pos = JOW_math.get_world_pos(child)
+        child_pos = JOW_maya_transforms.get_world_position(child)
         return child_pos - jnt_pos
 
     if index > 0:
-        prev_pos = JOW_math.get_world_pos(joints[index - 1])
+        prev_pos = JOW_maya_transforms.get_world_position(joints[index - 1])
         return jnt_pos - prev_pos
 
     return None
@@ -176,12 +204,7 @@ def apply_world_orientation_to_joint(jnt, matrix, all_positions):
         "transform",
         name="SDBM_orient_tmp"
     )
-    cmds.xform(
-        temp,
-        ws=True,
-        matrix=matrix
-    )
-
+    JOW_maya_transforms.set_world_matrix(temp, matrix)
     try:
         cmds.delete(
             cmds.orientConstraint(
@@ -201,14 +224,14 @@ def apply_world_orientation_to_joint(jnt, matrix, all_positions):
         )
 
     finally:
-        if cmds.objExists(temp):
+        if JOW_maya_nodes.exists(temp):
             cmds.delete(temp)
 
-    restore_joint_positions(all_positions)
+    JOW_maya_transforms.restore_world_positions(all_positions)
 
 def compute_chain_orientation(root, settings):
     result = []
-    joints = get_chain_joints(root)
+    joints = JOW_maya_joints.get_chain_joints(root)
 
     if len(joints) < 2:
         cmds.warning("{} has no child joints.".format(root))
@@ -226,7 +249,9 @@ def compute_chain_orientation(root, settings):
         if is_end_joint and not settings.orient_end_joint:
             continue
 
-        jnt_pos = JOW_math.get_world_pos(jnt)
+        jnt_pos = JOW_maya_transforms.get_world_position(jnt)
+        if jnt_pos is None:
+            continue
 
         forward = get_forward_for_joint(
             joints,
@@ -281,19 +306,9 @@ def orient_chain(
     root,
     settings
 ):
-    joints = get_chain_joints(root)
-    position_data = store_joint_positions(joints)
+    joints = JOW_maya_joints.get_chain_joints(root)
+    position_data = JOW_maya_transforms.store_world_positions(joints)
 
-    orientation_data = compute_chain_orientation(
-        root,
-        settings
-    )
-
-    apply_chain_orientation(
-        orientation_data,
-        position_data
-    )
-
-    restore_joint_positions(
-        position_data
-    )
+    orientation_data = compute_chain_orientation(root, settings)
+    apply_chain_orientation(orientation_data, position_data)
+    JOW_maya_transforms.restore_world_positions(position_data)

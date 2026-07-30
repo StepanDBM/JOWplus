@@ -56,6 +56,7 @@ class JOWViewport(QtWidgets.QFrame):
         self.normal_length = 60
 
         self.selected_guide = None
+        self.selected_guides = []
 
         self.selected_joint = None
         self.click_threshold = 6
@@ -170,6 +171,32 @@ class JOWViewport(QtWidgets.QFrame):
         self.update()
     def set_selected_guide(self, guide_name):
         self.selected_guide = guide_name
+
+        if guide_name:
+            self.selected_guides = [guide_name]
+        else:
+            self.selected_guides = []
+
+        self.update()
+    def set_selected_guides(self, guide_names):
+        clean_guides = []
+
+        for guide_name in guide_names or []:
+            if not guide_name:
+                continue
+
+            if guide_name in clean_guides:
+                continue
+
+            clean_guides.append(guide_name)
+
+        self.selected_guides = clean_guides
+
+        if clean_guides:
+            self.selected_guide = clean_guides[-1]
+        else:
+            self.selected_guide = None
+
         self.update()
     def set_orbit_target(self, point):
         if point is None:
@@ -182,6 +209,18 @@ class JOWViewport(QtWidgets.QFrame):
             point.z
         )
 
+    def is_guide_selected(self, guide_name):
+        if not guide_name:
+            return False
+
+        if guide_name == self.selected_guide:
+            return True
+
+        return guide_name in getattr(
+            self,
+            "selected_guides",
+            []
+        )
 
     def paintEvent(self, event):
         super(JOWViewport, self).paintEvent(event)

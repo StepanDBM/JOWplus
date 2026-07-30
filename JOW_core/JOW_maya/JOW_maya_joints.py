@@ -1,7 +1,6 @@
 import maya.cmds as cmds
 
 from JOW_core.JOW_maya import JOW_maya_nodes
-from JOW_core.JOW_maya import JOW_maya_joints
 from JOW_core.JOW_maya import JOW_maya_selection
 
 
@@ -113,7 +112,7 @@ def get_unique_joint_chains_from_roots(roots):
         if not is_joint(root):
             continue
 
-        joints = JOW_maya_joints.get_chain_joints(root)
+        joints = get_chain_joints(root)
 
         for joint in joints:
             if joint in nodes:
