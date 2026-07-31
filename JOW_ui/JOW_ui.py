@@ -17,6 +17,8 @@ from JOW_ui.JOW_gl import JOW_guides
 from JOW_ui.JOW_gl import JOW_preview
 from JOW_core.JOW_data import OrientationSettings
 
+from JOW_core.JOW_utils.JOW_undo import undo_chunk
+
 from JOW_core.JOW_maya import JOW_maya_nodes
 from JOW_core.JOW_maya import JOW_maya_joints
 from JOW_core.JOW_maya import JOW_maya_selection
@@ -64,7 +66,13 @@ class JOWWindow(QtWidgets.QDialog):
 
         self._syncing_selection_from_viewport = False
 
+        self.ui_settings = QtCore.QSettings(
+            "SDBM",
+            "JOW_SDBM"
+        )
+
         self.build_ui()
+        self.restore_ui_state()
         self.connect_signals()
 
         self.create_selection_script_job()
@@ -79,6 +87,107 @@ class JOWWindow(QtWidgets.QDialog):
     ##########################################################
     # Build UI
     ##########################################################
+
+    def settings_bool(self, key, default=False):
+        value = self.ui_settings.value(key, default)
+
+        if isinstance(value, bool):
+            return value
+
+        if isinstance(value, str):
+            return value.lower() in [
+                "true",
+                "1",
+                "yes"
+            ]
+
+        return bool(value)
+
+
+    def settings_int(self, key, default=0):
+        value = self.ui_settings.value(key, default)
+
+        try:
+            return int(value)
+        except Exception:
+            return default
+
+
+    def restore_combo_value(self, combo, key, default):
+        value = self.ui_settings.value(key, default)
+        index = combo.findText(value)
+        if index < 0:
+            return
+        combo.setCurrentIndex(index)
+
+
+    def restore_ui_state(self):
+        geometry = self.ui_settings.value("window/geometry")
+        if geometry:
+            self.restoreGeometry(geometry)
+        splitter_state = self.ui_settings.value("window/main_splitter")
+
+        if splitter_state:
+            self.main_splitter.restoreState(splitter_state)
+        self.tool_panel.native_rotation_axes_checkbox.setChecked(self.settings_bool("tool/maya_lra", False))
+
+        self.restore_combo_value(self.tool_panel.primary_combo,"tool/primary_axis","X")
+        self.restore_combo_value(self.tool_panel.secondary_combo,"tool/secondary_axis","Y")
+        self.restore_combo_value(self.tool_panel.mode_combo,"tool/secondary_mode","World")
+
+        self.settings_panel.show_overlay_checkbox.setChecked(self.settings_bool("settings/show_overlay", True))
+        self.settings_panel.show_delta_heatmap_checkbox.setChecked(self.settings_bool("settings/show_delta_heatmap", False))
+        self.settings_panel.live_sync_checkbox.setChecked(self.settings_bool("settings/live_sync", True))
+        self.settings_panel.show_plane_checkbox.setChecked(self.settings_bool("settings/show_plane", True))
+        self.settings_panel.flip_plane_checkbox.setChecked(self.settings_bool("settings/flip_plane", False))
+        self.settings_panel.average_normals_checkbox.setChecked(self.settings_bool("settings/average_normals", True))
+        self.settings_panel.show_grid_checkbox.setChecked(self.settings_bool("settings/show_grid", True))
+        self.settings_panel.orient_end_joint_checkbox.setChecked(self.settings_bool("settings/orient_end_joint", True))
+        self.settings_panel.show_joint_names_checkbox.setChecked(self.settings_bool("settings/show_joint_names", False))
+        self.settings_panel.split_branches_checkbox.setChecked(self.settings_bool("settings/split_branches", False))
+        self.settings_panel.show_axis_gizmo_checkbox.setChecked(self.settings_bool("settings/show_axis_gizmo", True))
+        self.settings_panel.show_3d_joints_checkbox.setChecked(self.settings_bool("settings/show_3d_joints", True))
+        self.settings_panel.show_current_axes_checkbox.setChecked(self.settings_bool("settings/show_current_axes", True))
+        self.settings_panel.show_preview_axes_checkbox.setChecked(self.settings_bool("settings/show_preview_axes", True))
+
+        self.restore_combo_value(self.settings_panel.projection_combo,"settings/projection","Orbit")
+        self.settings_panel.axis_length_spinbox.setValue(self.settings_int("settings/axis_length",28))
+        self.settings_panel.joint_size_spinbox.setValue(self.settings_int("settings/joint_size",5))
+        self.settings_panel.normal_length_spinbox.setValue(self.settings_int("settings/normal_length",60))
+
+        self.cache_panel.lock_selection_checkbox.setChecked(self.settings_bool("cache/lock_cache", True))
+        self.cache_panel.apply_cached_chain_checkbox.setChecked(self.settings_bool("cache/apply_cached", True))
+
+
+    def save_ui_state(self):
+        self.ui_settings.setValue("window/geometry",self.saveGeometry())
+        self.ui_settings.setValue("window/main_splitter",self.main_splitter.saveState())
+        self.ui_settings.setValue("tool/maya_lra",self.tool_panel.native_rotation_axes_enabled())
+        self.ui_settings.setValue("tool/primary_axis",self.tool_panel.primary_axis())
+        self.ui_settings.setValue("tool/secondary_axis",self.tool_panel.secondary_axis())
+        self.ui_settings.setValue("tool/secondary_mode",self.tool_panel.secondary_mode())
+        self.ui_settings.setValue("settings/show_overlay",self.settings_panel.show_overlay())
+        self.ui_settings.setValue("settings/show_delta_heatmap",self.settings_panel.show_delta_heatmap())
+        self.ui_settings.setValue("settings/live_sync",self.settings_panel.live_sync_enabled())
+        self.ui_settings.setValue("settings/show_plane",self.settings_panel.show_plane())
+        self.ui_settings.setValue("settings/flip_plane",self.settings_panel.flip_plane())
+        self.ui_settings.setValue("settings/average_normals",self.settings_panel.average_normals())
+        self.ui_settings.setValue("settings/show_grid",self.settings_panel.show_grid())
+        self.ui_settings.setValue("settings/orient_end_joint",self.settings_panel.orient_end_joint())
+        self.ui_settings.setValue("settings/show_joint_names",self.settings_panel.show_joint_names())
+        self.ui_settings.setValue("settings/split_branches",self.settings_panel.split_branches())
+        self.ui_settings.setValue("settings/show_axis_gizmo",self.settings_panel.show_axis_gizmo())
+        self.ui_settings.setValue("settings/show_3d_joints",self.settings_panel.show_3d_joints())
+        self.ui_settings.setValue("settings/show_current_axes",self.settings_panel.show_current_axes())
+        self.ui_settings.setValue("settings/show_preview_axes",self.settings_panel.show_preview_axes())
+        self.ui_settings.setValue("settings/projection",self.settings_panel.projection_mode())
+        self.ui_settings.setValue("settings/axis_length",self.settings_panel.axis_length())
+        self.ui_settings.setValue("settings/joint_size",self.settings_panel.joint_size())
+        self.ui_settings.setValue("settings/normal_length",self.settings_panel.normal_length())
+        self.ui_settings.setValue("cache/lock_cache",self.cache_panel.is_cache_locked())
+        self.ui_settings.setValue("cache/apply_cached",self.cache_panel.apply_cached())
+
+        self.ui_settings.sync()
 
     def build_ui(self):
         margins = 4
@@ -287,6 +396,7 @@ class JOWWindow(QtWidgets.QDialog):
         self.update_set_cache_button_state()
 
     def closeEvent(self, event):
+        self.save_ui_state()
         self.stop_live_sync_timer()
         self.delete_selection_script_job()
         QtWidgets.QDialog.closeEvent(self, event)
@@ -1108,10 +1218,9 @@ class JOWWindow(QtWidgets.QDialog):
         finally:
             self._live_sync_refreshing = False
 
+    @undo_chunk
     def set_cached_native_rotation_axes_visibility(self, state):
-        cached_joints = set(
-            self.get_cached_joint_nodes()
-        )
+        cached_joints = set(self.get_cached_joint_nodes())
 
         nodes_to_disable = (
             self.native_rotation_axis_nodes - cached_joints
