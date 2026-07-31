@@ -426,6 +426,17 @@ class JOWOverlayDrawer:
         return total
 
     def get_selected_joint_short_name(self):
+        selected_joints = getattr(
+            self.viewport,
+            "selected_joints",
+            []
+        )
+
+        if len(selected_joints) > 1:
+            return "{} joints".format(
+                len(selected_joints)
+            )
+
         selected = self.viewport.selected_joint
 
         if not selected:

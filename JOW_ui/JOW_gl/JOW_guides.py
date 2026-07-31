@@ -1,5 +1,7 @@
 import maya.cmds as cmds
 
+import hashlib
+
 from JOW_core.JOW_maya import JOW_maya_selection
 from JOW_core.JOW_maya import JOW_maya_nodes
 from JOW_core.JOW_maya import JOW_maya_transforms
@@ -16,6 +18,7 @@ def get_safe_node_token(node):
         return "Unknown"
 
     token = JOW_maya_nodes.short_name(node)
+
     clean = []
 
     for char in token:
@@ -27,12 +30,38 @@ def get_safe_node_token(node):
     return "".join(clean)
 
 
-def make_guide_name_for_root(root):
-    return "{}_{}".format(
-        GUIDE_PREFIX,
-        get_safe_node_token(root)
-    )
+def get_stable_node_suffix(node):
+    if not node:
+        return "unknown"
 
+    try:
+        uuids = cmds.ls(
+            node,
+            uuid=True
+        ) or []
+
+        if uuids:
+            return uuids[0].replace(
+                "-",
+                ""
+            )[:8]
+
+    except Exception:
+        pass
+
+    digest = hashlib.md5(
+        node.encode("utf-8")
+    ).hexdigest()
+
+    return digest[:8]
+
+
+def make_guide_name_for_root(root):
+    return "{}_{}_{}".format(
+        GUIDE_PREFIX,
+        get_safe_node_token(root),
+        get_stable_node_suffix(root)
+    )
 
 def is_jow_guide(node):
     if not node:
@@ -88,6 +117,14 @@ def create_guide_node(name, position=None):
         guide = name
     else:
         guide = cmds.spaceLocator(name=name)[0]
+
+    long_guides = cmds.ls(
+        guide,
+        long=True
+    ) or []
+
+    if long_guides:
+        guide = long_guides[0]
 
     if position is not None:
         JOW_maya_transforms.set_world_position(

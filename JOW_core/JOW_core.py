@@ -27,29 +27,26 @@ def apply_orientation(settings):
     if settings.primary_axis == settings.secondary_axis:
         cmds.warning("Primary Axis and Secondary Axis cannot be the same.")
         return
-
-    custom_objects_by_root = getattr(
-        settings,
-        "custom_objects_by_root",
-        {}
-    )
-
+    
     applied_count = 0
     skipped_count = 0
 
     for root in roots:
-        root_settings = copy.copy(settings)
         if settings.secondary_mode == "Custom Object":
-            if root in custom_objects_by_root:
-                root_settings.custom_object = custom_objects_by_root[root]
-            elif settings.custom_object:
-                root_settings.custom_object = settings.custom_object
-            else:
-                skipped_count += 1
-                continue
+            oriented_count, root_skipped_count = orient_root_with_custom_object_mapping(
+                root,
+                settings
+            )
 
-        orient_chain(root, root_settings)
-        applied_count += 1
+            applied_count += oriented_count
+            skipped_count += root_skipped_count
+            continue
+
+        root_settings = copy.copy(settings)
+        oriented_count = orient_chain(root, root_settings)
+
+        if oriented_count:
+            applied_count += oriented_count
 
     if applied_count == 0:
         cmds.warning(
@@ -71,133 +68,32 @@ def apply_orientation(settings):
             fade=True
         )
 
+def get_position_lock_nodes_for_root(root):
+    nodes = JOW_maya_joints.get_chain_joints(root)
 
-def get_top_joint(jnt):
-    current = jnt
-    while True:
-        parent = cmds.listRelatives(
-            current,
-            p=True,
-            type="joint",
-            fullPath=True
-        )
-
-        if not parent:
-            break
-        current = parent[0]
-    return current
-
-
-def get_chain_joints(root):
-    joints = [root]
-
-    descendants = cmds.listRelatives(
-        root,
-        ad=True,
-        type="joint",
-        fullPath=True
-    ) or []
-
-    descendants.reverse()
-    joints.extend(descendants)
-
-    return joints
-
-
-def get_custom_object_from_selection():
-    selected = cmds.ls(sl=True, long=True) or []
-
-    for obj in selected:
-        if cmds.nodeType(obj) != "joint":
-            return obj
-
-    return None
-
-def get_unique_roots_from_selection():
-    selected = cmds.ls(sl=True, long=True) or []
-
-    joints = cmds.ls(
-        selected,
-        type="joint",
-        long=True
-    ) or []
-
-    roots = []
-
-    for jnt in joints:
-
-        root = JOW_maya_joints.get_top_joint(jnt)
-
-        if root not in roots:
-            roots.append(root)
-
-    return roots
-
-def get_first_child_joint(jnt):
-    children = cmds.listRelatives(
-        jnt,
-        c=True,
-        type="joint",
-        fullPath=True
-    ) or []
-
-    if not children:
-        return None
-
-    return children[0]
-
-def get_parent_joint(jnt):
-    parent = cmds.listRelatives(
-        jnt,
-        p=True,
-        type="joint",
-        fullPath=True
-    ) or []
-
-    if not parent:
-        return None
-
-    return parent[0]
-
+    return [
+        node for node in nodes
+        if JOW_maya_nodes.exists(node)
+    ]
 
 def get_forward_for_joint(joints, index, jnt):
-    child = JOW_maya_joints.get_first_child_joint(jnt)
     jnt_pos = JOW_maya_transforms.get_world_position(jnt)
+    if jnt_pos is None:
+        return None
 
-    if child:
-        child_pos = JOW_maya_transforms.get_world_position(child)
-        return child_pos - jnt_pos
+    if index + 1 < len(joints):
+        next_pos = JOW_maya_transforms.get_world_position(joints[index + 1])
+        if next_pos is None:
+            return None
+        return next_pos - jnt_pos
 
     if index > 0:
         prev_pos = JOW_maya_transforms.get_world_position(joints[index - 1])
+        if prev_pos is None:
+            return None
         return jnt_pos - prev_pos
 
     return None
-
-
-def store_joint_positions(joints):
-    data = {}
-
-    for jnt in joints:
-        data[jnt] = cmds.xform(
-            jnt,
-            q=True,
-            ws=True,
-            t=True
-        )
-
-    return data
-
-
-def restore_joint_positions(position_data):
-    for jnt, pos in position_data.items():
-        if cmds.objExists(jnt):
-            cmds.xform(
-                jnt,
-                ws=True,
-                t=pos
-            )
-
 
 def apply_world_orientation_to_joint(jnt, matrix, all_positions):
     temp = cmds.createNode(
@@ -229,12 +125,22 @@ def apply_world_orientation_to_joint(jnt, matrix, all_positions):
 
     JOW_maya_transforms.restore_world_positions(all_positions)
 
-def compute_chain_orientation(root, settings):
+def compute_linear_chain_orientation(joints, settings):
     result = []
-    joints = JOW_maya_joints.get_chain_joints(root)
+
+    joints = [
+        joint for joint in joints or []
+        if JOW_maya_nodes.exists(joint)
+    ]
 
     if len(joints) < 2:
-        cmds.warning("{} has no child joints.".format(root))
+        if joints:
+            cmds.warning(
+                "{} has no child joints.".format(
+                    joints[0]
+                )
+            )
+
         return result
 
     curve_plane_normal = JOW_math.compute_curve_plane_normal(
@@ -250,14 +156,11 @@ def compute_chain_orientation(root, settings):
             continue
 
         jnt_pos = JOW_maya_transforms.get_world_position(jnt)
+
         if jnt_pos is None:
             continue
 
-        forward = get_forward_for_joint(
-            joints,
-            i,
-            jnt
-        )
+        forward = get_forward_for_joint(joints, i, jnt)
 
         if forward is None:
             continue
@@ -281,14 +184,31 @@ def compute_chain_orientation(root, settings):
             settings.secondary_axis
         )
 
-        result.append(
-            JointOrientation(
-                joint=jnt,
-                matrix=matrix
-            )
-        )
+        result.append(JointOrientation(joint=jnt, matrix=matrix))
 
     return result
+
+def compute_chain_orientation(root, settings):
+    joints = JOW_maya_joints.get_chain_joints(root)
+    return compute_linear_chain_orientation(joints, settings)
+
+def orient_linear_chain(joints, settings, position_data=None):
+    joints = [
+        joint for joint in joints or []
+        if JOW_maya_nodes.exists(joint)
+    ]
+    if len(joints) < 2:
+        return False
+
+    owns_position_data = (position_data is None)
+
+    if owns_position_data:
+        position_data = JOW_maya_transforms.store_world_positions(joints)
+    orientation_data = compute_linear_chain_orientation(joints, settings)
+    apply_chain_orientation(orientation_data, position_data)
+    JOW_maya_transforms.restore_world_positions(position_data)
+
+    return bool(orientation_data)
 
 def apply_chain_orientation(
     orientation_data,
@@ -302,13 +222,87 @@ def apply_chain_orientation(
         )
 
 
-def orient_chain(
-    root,
-    settings
-):
-    joints = JOW_maya_joints.get_chain_joints(root)
-    position_data = JOW_maya_transforms.store_world_positions(joints)
+def orient_chain(root, settings):
+    if getattr(settings, "split_branches", False):
+        joint_chains = JOW_maya_joints.get_linear_chains_from_root(root)
+    else:
+        joint_chains = [JOW_maya_joints.get_chain_joints(root)]
 
-    orientation_data = compute_chain_orientation(root, settings)
-    apply_chain_orientation(orientation_data, position_data)
-    JOW_maya_transforms.restore_world_positions(position_data)
+    position_lock_nodes = get_position_lock_nodes_for_root(root)
+    position_data = JOW_maya_transforms.store_world_positions(position_lock_nodes)
+    oriented_count = 0
+
+    for joints in joint_chains:
+        if orient_linear_chain(
+            joints,
+            settings,
+            position_data=position_data
+        ):
+            oriented_count += 1
+
+        JOW_maya_transforms.restore_world_positions(position_data)
+    return oriented_count
+
+def orient_root_with_custom_object_mapping(root, settings):
+    custom_objects_by_root = getattr(
+        settings,
+        "custom_objects_by_root",
+        {}
+    )
+
+    if getattr(settings, "split_branches", False):
+        joint_chains = JOW_maya_joints.get_linear_chains_from_root(root)
+    else:
+        joint_chains = [JOW_maya_joints.get_chain_joints(root)]
+
+    guided_entries = []
+    skipped_count = 0
+
+    for joints in joint_chains:
+        if not joints:
+            continue
+
+        orient_root = joints[0]
+        custom_object = custom_objects_by_root.get(orient_root)
+
+        if not custom_object:
+            skipped_count += 1
+            continue
+
+        root_settings = copy.copy(settings)
+        root_settings.custom_object = custom_object
+        guided_entries.append((joints, root_settings))
+
+    if not guided_entries:
+        return 0, skipped_count
+
+    lock_nodes = get_position_lock_nodes_for_root(root)
+
+    target_nodes = set(
+        joint
+        for joints, root_settings in guided_entries
+        for joint in joints
+    )
+
+    protected_nodes = [
+        node for node in lock_nodes
+        if node not in target_nodes
+    ]
+
+    position_data = JOW_maya_transforms.store_world_positions(lock_nodes)
+    protected_matrix_data = JOW_maya_transforms.store_world_matrices(protected_nodes)
+
+    oriented_count = 0
+
+    for joints, root_settings in guided_entries:
+        if orient_linear_chain(
+            joints,
+            root_settings,
+            position_data=position_data
+        ):
+            oriented_count += 1
+
+        JOW_maya_transforms.restore_world_matrices(protected_matrix_data)
+        JOW_maya_transforms.restore_world_positions(position_data)
+
+    return oriented_count, skipped_count

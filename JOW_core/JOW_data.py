@@ -12,6 +12,7 @@ class OrientationSettings:
     flip_plane: bool = False
     average_normals: bool = True
     orient_end_joint: bool = True
+    split_branches: bool = False
     roots: list = field(default_factory=list)
 
 

@@ -23,8 +23,6 @@ class JOWSettingsPanel(QtWidgets.QWidget):
     frame_selected_requested = QtCore.Signal()
     reset_view_requested = QtCore.Signal()
 
-    native_rotation_axes_toggled = QtCore.Signal(bool)
-
     def __init__(self, parent=None):
         super(JOWSettingsPanel, self).__init__(parent)
 
@@ -113,10 +111,10 @@ class JOWSettingsPanel(QtWidgets.QWidget):
             checked=False,
             tooltip="Show joint names in the viewport."
         )
-        self.native_rotation_axes_checkbox = create_toggle_button(
-            "Maya LRA",
+        self.split_branches_checkbox = create_toggle_button(
+            "Split Branches",
             checked=False,
-            tooltip="Show or hide Maya native Local Rotation Axes on cached joints only."
+            tooltip="When a joint has multiple child joints, treat each child branch as its own orientation chain."
         )
 
         self.show_grid_checkbox = create_toggle_button(
@@ -137,7 +135,7 @@ class JOWSettingsPanel(QtWidgets.QWidget):
         self.options_layout.addWidget(self.show_grid_checkbox, 0, 3)
         self.options_layout.addWidget(self.orient_end_joint_checkbox, 1, 0)
         self.options_layout.addWidget(self.show_joint_names_checkbox, 1, 1)
-        self.options_layout.addWidget(self.native_rotation_axes_checkbox, 1, 2)
+        self.options_layout.addWidget(self.split_branches_checkbox, 1, 2)
         self.options_layout.addWidget(self.show_axis_gizmo_checkbox, 1, 3)
         main_layout.addLayout(self.options_layout)
 
@@ -213,7 +211,7 @@ class JOWSettingsPanel(QtWidgets.QWidget):
         self.live_sync_checkbox.toggled.connect(self.live_sync_toggled.emit)
         self.projection_combo.currentTextChanged.connect(self.projection_changed.emit)
 
-        self.native_rotation_axes_checkbox.toggled.connect(self.native_rotation_axes_toggled.emit)
+        self.split_branches_checkbox.toggled.connect(self.emit_preview_settings_changed)
 
         self.frame_preview_btn.clicked.connect(self.frame_preview_requested.emit)
         self.frame_selected_btn.clicked.connect(self.frame_selected_requested.emit)
@@ -255,8 +253,8 @@ class JOWSettingsPanel(QtWidgets.QWidget):
         return self.orient_end_joint_checkbox.isChecked()
     def live_sync_enabled(self):
         return self.live_sync_checkbox.isChecked()
-    def native_rotation_axes_enabled(self):
-        return self.native_rotation_axes_checkbox.isChecked()
+    def split_branches(self):
+        return self.split_branches_checkbox.isChecked()
     def projection_mode(self):
         return self.projection_combo.currentText()
     def axis_length(self):

@@ -11,6 +11,55 @@ class JOWAxisDrawer:
     def __init__(self, viewport):
         self.viewport = viewport
 
+    def is_chain_root_joint(self, joint):
+        return (
+            getattr(
+                joint,
+                "is_chain_root",
+                False
+            ) and
+            getattr(
+                self.viewport,
+                "show_root_viz",
+                True
+            )
+        )
+
+
+    def get_axis_length_for_joint(self, joint):
+        length = self.viewport.axis_length
+
+        if self.is_chain_root_joint(joint):
+            length *= getattr(
+                self.viewport,
+                "root_axis_length_multiplier",
+                1.65
+            )
+
+        return length
+
+
+    def get_axis_width_for_joint(self, joint):
+        if self.is_chain_root_joint(joint):
+            return getattr(
+                self.viewport,
+                "root_axis_width",
+                3
+            )
+
+        return 2
+
+
+    def get_axis_label_offset_for_joint(self, joint):
+        if self.is_chain_root_joint(joint):
+            return getattr(
+                self.viewport,
+                "root_axis_label_offset",
+                8
+            )
+
+        return 4
+
     def draw_axes(self, painter, chain, bounds, scale, rect):
         if self.viewport.show_current_axes:
             self.draw_current_axes(
@@ -37,42 +86,53 @@ class JOWAxisDrawer:
                 scale,
                 rect
             )
-
             show_labels = (
+                joint.name in getattr(
+                    self.viewport,
+                    "selected_joints",
+                    []
+                ) or
                 joint.name == self.viewport.selected_joint
             )
+
+            axis_length = self.get_axis_length_for_joint(joint)
+            axis_width = self.get_axis_width_for_joint(joint)
+            label_offset = self.get_axis_label_offset_for_joint(joint)
 
             self.draw_axis(
                 painter,
                 origin,
                 joint.x_axis,
-                self.viewport.axis_length,
+                axis_length,
                 QtGui.QColor(255, 80, 80),
                 "X" if show_labels else None,
-                width=2,
-                style=QtCore.Qt.SolidLine
+                width=axis_width,
+                style=QtCore.Qt.SolidLine,
+                label_offset=label_offset
             )
 
             self.draw_axis(
                 painter,
                 origin,
                 joint.y_axis,
-                self.viewport.axis_length,
+                axis_length,
                 QtGui.QColor(80, 255, 80),
                 "Y" if show_labels else None,
-                width=2,
-                style=QtCore.Qt.SolidLine
+                width=axis_width,
+                style=QtCore.Qt.SolidLine,
+                label_offset=label_offset
             )
 
             self.draw_axis(
                 painter,
                 origin,
                 joint.z_axis,
-                self.viewport.axis_length,
+                axis_length,
                 QtGui.QColor(80, 140, 255),
                 "Z" if show_labels else None,
-                width=2,
-                style=QtCore.Qt.SolidLine
+                width=axis_width,
+                style=QtCore.Qt.SolidLine,
+                label_offset=label_offset
             )
     def draw_current_axes(self, painter, chain, bounds, scale, rect):
         for joint in chain.joints:
@@ -85,9 +145,8 @@ class JOWAxisDrawer:
                 scale,
                 rect
             )
-
-            #length = self.viewport.axis_length * 0.8
-            length = self.viewport.axis_length
+            length = self.get_axis_length_for_joint(joint)
+            width = self.get_axis_width_for_joint(joint)
 
             self.draw_axis(
                 painter,
@@ -96,7 +155,7 @@ class JOWAxisDrawer:
                 length,
                 QtGui.QColor(160, 70, 70, 150),
                 None,
-                width=2,
+                width=width,
                 style=QtCore.Qt.DashLine
             )
 
@@ -107,7 +166,7 @@ class JOWAxisDrawer:
                 length,
                 QtGui.QColor(70, 160, 70, 150),
                 None,
-                width=2,
+                width=width,
                 style=QtCore.Qt.DashLine
             )
 
@@ -118,11 +177,11 @@ class JOWAxisDrawer:
                 length,
                 QtGui.QColor(70, 100, 180, 150),
                 None,
-                width=2,
+                width=width,
                 style=QtCore.Qt.DashLine
             )
 
-    def draw_axis(self, painter, origin, axis, length, color, label=None, width=2, style=QtCore.Qt.SolidLine):
+    def draw_axis(self, painter, origin, axis, length, color, label=None, width=2, style=QtCore.Qt.SolidLine, label_offset=4):
         if axis is None:
             return
 
@@ -140,7 +199,10 @@ class JOWAxisDrawer:
         if label:
             painter.setPen(color)
             painter.drawText(
-                end + QtCore.QPointF(4, -4),
+                end + QtCore.QPointF(
+                    label_offset,
+                    -label_offset
+                ),
                 label
             )
 

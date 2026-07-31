@@ -33,6 +33,8 @@ class JOWViewport(QtWidgets.QFrame):
         self.view_center_b = 0.0
         self.view_scale = 40.0
 
+        self.split_branches = False
+
         self.last_mouse_pos = None
         self.mouse_press_pos = None
         self.projection_mode = "Orbit"
@@ -55,8 +57,18 @@ class JOWViewport(QtWidgets.QFrame):
         self.selected_joint_size = 8
         self.normal_length = 60
 
+        self.show_root_viz = True
+        self.root_bone_width = 5
+        self.root_joint_ring_width = 3
+        self.root_joint_size_multiplier = 1.45
+
+        self.root_axis_length_multiplier = 1.65
+        self.root_axis_width = 3
+        self.root_axis_label_offset = 8
+
         self.selected_guide = None
         self.selected_guides = []
+        self.selected_joints = []
 
         self.selected_joint = None
         self.click_threshold = 6
@@ -119,6 +131,32 @@ class JOWViewport(QtWidgets.QFrame):
         self.update()
     def set_selected_joint(self, joint_name):
         self.selected_joint = joint_name
+
+        if joint_name:
+            self.selected_joints = [joint_name]
+        else:
+            self.selected_joints = []
+
+        self.update()
+    def set_selected_joints(self, joint_names):
+        clean_joints = []
+
+        for joint_name in joint_names or []:
+            if not joint_name:
+                continue
+
+            if joint_name in clean_joints:
+                continue
+
+            clean_joints.append(joint_name)
+
+        self.selected_joints = clean_joints
+
+        if clean_joints:
+            self.selected_joint = clean_joints[-1]
+        else:
+            self.selected_joint = None
+
         self.update()
     def set_show_grid(self, state):
         self.show_grid = state
@@ -150,11 +188,14 @@ class JOWViewport(QtWidgets.QFrame):
         self.secondary_axis = settings.secondary_axis
         self.flip_plane = settings.flip_plane
         self.average_normals = settings.average_normals
-        self.orient_end_joint = getattr(
+        self.orient_end_joint = settings.orient_end_joint
+
+        self.split_branches = getattr(
             settings,
-            "orient_end_joint",
-            True
+            "split_branches",
+            False
         )
+
         self.apply_target_label = apply_target_label
         self.update()
     def set_show_current_axes(self, state):

@@ -1,5 +1,7 @@
 import copy
 
+import maya.cmds as cmds
+
 import JOW_core.JOW_math as JOW_math
 
 from JOW_core import JOW_core
@@ -13,6 +15,7 @@ from JOW_core.JOW_maya import JOW_maya_transforms
 class PreviewJoint:
     def __init__(self):
         self.name = ""
+        self.is_chain_root = False #chain-aware path addition
 
         # Preview / proposed orientation.
         self.position = None
@@ -37,6 +40,11 @@ class PreviewChain:
         self.curve_plane_normal = None
         self.previous_normals = []
         self.guide = None
+
+        self.root_parent = None    # Visual-only branch continuity link.
+        self.root_parent_position = None
+
+        self.bone_links = []
 
 
 class PreviewNormal:
@@ -104,6 +112,51 @@ def clear_cache():
     _CACHED_CUSTOM_OBJECT = None
     _CACHED_GUIDES_BY_ROOT = {}
 
+def guide_owner_belongs_to_cached_roots(owner_root, cached_roots):
+    if not owner_root:
+        return False
+
+    if not JOW_maya_nodes.exists(owner_root):
+        return False
+
+    for cached_root in cached_roots or []:
+        if not cached_root:
+            continue
+
+        if not JOW_maya_nodes.exists(cached_root):
+            continue
+
+        if owner_root == cached_root:
+            return True
+
+        if owner_root.startswith(cached_root + "|"):
+            return True
+
+    return False
+
+def get_duplicate_short_names(nodes):
+    names_by_short_name = {}
+
+    for node in nodes or []:
+        short_name = JOW_maya_nodes.short_name(
+            node
+        )
+
+        names_by_short_name.setdefault(
+            short_name,
+            []
+        ).append(node)
+
+    duplicates = {}
+
+    for short_name, matching_nodes in names_by_short_name.items():
+        if len(matching_nodes) <= 1:
+            continue
+
+        duplicates[short_name] = matching_nodes
+
+    return duplicates
+
 
 def validate_cached_roots():
     global _CACHED_ROOTS
@@ -119,12 +172,16 @@ def validate_cached_roots():
 
     _CACHED_ROOTS = valid_roots
 
-    valid_root_set = set(_CACHED_ROOTS)
-
     _CACHED_GUIDES_BY_ROOT = {
         root: guide
         for root, guide in _CACHED_GUIDES_BY_ROOT.items()
-        if root in valid_root_set
+        if (
+            guide_owner_belongs_to_cached_roots(
+                root,
+                _CACHED_ROOTS
+            ) and
+            JOW_maya_nodes.exists(guide)
+        )
     }
 
     validate_cached_guides()
@@ -291,10 +348,29 @@ def nodes_match(node_a, node_b):
     if node_a == node_b:
         return True
 
-    return (
-        JOW_maya_nodes.short_name(node_a) ==
-        JOW_maya_nodes.short_name(node_b)
-    )
+    if not JOW_maya_nodes.exists(node_a):
+        return False
+
+    if not JOW_maya_nodes.exists(node_b):
+        return False
+
+    matches_a = cmds.ls(
+        node_a,
+        long=True
+    ) or []
+
+    matches_b = cmds.ls(
+        node_b,
+        long=True
+    ) or []
+
+    if not matches_a:
+        return False
+
+    if not matches_b:
+        return False
+
+    return matches_a[0] == matches_b[0]
 
 
 def get_cached_guides_by_root():
@@ -400,8 +476,16 @@ def validate_cached_guides():
 
     valid_guides = {}
 
+    cached_roots = [
+        root for root in _CACHED_ROOTS
+        if JOW_maya_nodes.exists(root)
+    ]
+
     for root, guide in _CACHED_GUIDES_BY_ROOT.items():
-        if not JOW_maya_nodes.exists(root):
+        if not guide_owner_belongs_to_cached_roots(
+            root,
+            cached_roots
+        ):
             continue
 
         if not JOW_maya_nodes.exists(guide):
@@ -556,11 +640,21 @@ def position_from_matrix(matrix):
         matrix[14]
     ])
 
+def build_preview_chain_from_joints(joints, settings):
+    if not joints:
+        return None
 
-def build_preview_chain(root, settings):
+    if len(joints) < 2:
+        return None
+
     preview_chain = PreviewChain()
-    preview_chain.root = root
-    joints = JOW_maya_joints.get_chain_joints(root)
+    preview_chain.root = joints[0]
+    set_preview_chain_root_parent_link(
+        preview_chain,
+        joints,
+        settings
+    )
+
     preview_chain.curve_plane_center = get_chain_center(joints)
 
     preview_chain.curve_plane_normal = JOW_math.compute_curve_plane_normal(
@@ -575,20 +669,15 @@ def build_preview_chain(root, settings):
     )
 
     root_settings = copy.copy(settings)
+
     root_settings.custom_object = get_effective_custom_object_for_root(
-        root,
+        preview_chain.root,
         fallback_custom_object=settings.custom_object
     )
 
-    preview_chain.guide = build_preview_guide(
-        root,
-        root_settings
-    )
+    preview_chain.guide = build_preview_guide(preview_chain.root, root_settings)
 
-    orientation_data = JOW_core.compute_chain_orientation(
-        root,
-        root_settings
-    )
+    orientation_data = JOW_core.compute_linear_chain_orientation(joints, root_settings)
 
     for entry in orientation_data:
         current_matrix = JOW_maya_transforms.get_world_matrix(entry.joint)
@@ -599,23 +688,17 @@ def build_preview_chain(root, settings):
         preview_joint = PreviewJoint()
         preview_joint.name = entry.joint
 
-        ##########################################################
-        # Current Maya orientation before Apply
-        ##########################################################
+        preview_joint.is_chain_root = (len(preview_chain.joints) == 0)
+
         preview_joint.current_matrix = current_matrix
         preview_joint.current_position = position_from_matrix(current_matrix)
 
-        current_x_axis, current_y_axis, current_z_axis = axes_from_matrix(
-            current_matrix
-        )
+        current_x_axis, current_y_axis, current_z_axis = axes_from_matrix(current_matrix)
 
         preview_joint.current_x_axis = current_x_axis
         preview_joint.current_y_axis = current_y_axis
         preview_joint.current_z_axis = current_z_axis
 
-        ##########################################################
-        # Preview / proposed JOW orientation
-        ##########################################################
         preview_joint.matrix = entry.matrix
         preview_joint.position = position_from_matrix(entry.matrix)
 
@@ -626,21 +709,100 @@ def build_preview_chain(root, settings):
         preview_joint.z_axis = z_axis
 
         preview_chain.joints.append(preview_joint)
-
+        
+    populate_preview_chain_bone_links(preview_chain)
     return preview_chain
 
+def build_preview_chain(root, settings):
+    joints = JOW_maya_joints.get_chain_joints(root)
+    return build_preview_chain_from_joints(joints, settings)
+
+def get_orient_roots_for_root(root, settings):
+    if not root:
+        return []
+
+    if not JOW_maya_nodes.exists(root):
+        return []
+
+    if getattr(settings, "split_branches", False):
+        joint_chains = JOW_maya_joints.get_linear_chains_from_root(
+            root
+        )
+
+        roots = []
+
+        for joints in joint_chains:
+            if not joints:
+                continue
+
+            orient_root = joints[0]
+
+            if orient_root in roots:
+                continue
+
+            roots.append(orient_root)
+
+        return roots
+
+    return [
+        root
+    ]
+
+
+def get_orient_roots_for_roots(roots, settings):
+    orient_roots = []
+
+    for root in roots or []:
+        roots_for_root = get_orient_roots_for_root(
+            root,
+            settings
+        )
+
+        for orient_root in roots_for_root:
+            if orient_root in orient_roots:
+                continue
+
+            orient_roots.append(orient_root)
+
+    return orient_roots
+
+def get_preview_joint_chains_for_root(root, settings):
+    if getattr(settings, "split_branches", False):
+        return JOW_maya_joints.get_linear_chains_from_root(
+            root
+        )
+
+    joints = JOW_maya_joints.get_chain_joints(
+        root
+    )
+
+    if not joints:
+        return []
+
+    return [
+        joints
+    ]
 
 def build_preview_chains(settings):
     preview_chains = []
     roots = get_preview_roots()
+    
     if not roots:
         return preview_chains
+    preview_settings = copy.copy(settings)#avoid mutating.
+    if preview_settings.custom_object is None:
+        preview_settings.custom_object = get_cached_custom_object()
 
-    if settings.custom_object is None:
-        settings.custom_object = get_cached_custom_object()
     for root in roots:
-        preview_chain = build_preview_chain(root, settings)
-        preview_chains.append(preview_chain)
+        joint_chains = get_preview_joint_chains_for_root(root, preview_settings)
+        for joints in joint_chains:
+            preview_chain = build_preview_chain_from_joints(joints, preview_settings)
+            if not preview_chain:
+                continue
+            if not preview_chain.joints:
+                continue
+
+            preview_chains.append(preview_chain)
 
     return preview_chains
 
@@ -692,3 +854,68 @@ def build_preview_guide(root, settings):
     guide.position = position
 
     return guide
+
+
+def set_preview_chain_root_parent_link(preview_chain, joints, settings):
+    if not preview_chain:
+        return
+    if not joints:
+        return
+    if not getattr(settings, "split_branches", False):
+        return
+    root = joints[0]
+    parent = JOW_maya_joints.get_parent_joint(root)
+
+    if not parent:
+        return
+    if not JOW_maya_nodes.exists(parent):
+        return
+
+    # Only draw this for actual branch roots.
+    # If the parent is not a branch joint, this is probably just an
+    # externally parented selected root, not a split-child chain.
+    if not JOW_maya_joints.is_branch_joint(parent):
+        return
+    parent_position = JOW_maya_transforms.get_world_position(parent)
+    if parent_position is None:
+        return
+
+    preview_chain.root_parent = parent
+    preview_chain.root_parent_position = parent_position
+
+
+def populate_preview_chain_bone_links(preview_chain):
+    if not preview_chain:
+        return
+
+    preview_chain.bone_links = []
+
+    joints_by_name = {}
+
+    for preview_joint in preview_chain.joints:
+        if not preview_joint.name:
+            continue
+
+        joints_by_name[preview_joint.name] = preview_joint
+
+    for child_name, child_joint in joints_by_name.items():
+        parent = JOW_maya_joints.get_parent_joint(
+            child_name
+        )
+
+        if not parent:
+            continue
+
+        parent_joint = joints_by_name.get(
+            parent
+        )
+
+        if parent_joint is None:
+            continue
+
+        preview_chain.bone_links.append(
+            (
+                parent_joint,
+                child_joint
+            )
+        )

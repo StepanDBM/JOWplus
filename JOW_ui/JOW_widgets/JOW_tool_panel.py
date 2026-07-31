@@ -6,6 +6,7 @@ except ImportError:
     from PySide6 import QtCore
 
 from JOW_ui.JOW_widgets.JOW_widget_utils import create_action_button
+from JOW_ui.JOW_widgets.JOW_widget_utils import create_toggle_button
 
 
 class JOWToolPanel(QtWidgets.QWidget):
@@ -16,6 +17,8 @@ class JOWToolPanel(QtWidgets.QWidget):
     select_guide_requested = QtCore.Signal()
     delete_guide_requested = QtCore.Signal()
     pick_custom_object_requested = QtCore.Signal()
+
+    native_rotation_axes_toggled = QtCore.Signal(bool)
 
     AXES = ["X", "Y", "Z"]
 
@@ -36,6 +39,15 @@ class JOWToolPanel(QtWidgets.QWidget):
         self.configuration_layout = QtWidgets.QHBoxLayout()
         self.configuration_layout.setContentsMargins(0, 0, 0, 0)
         self.configuration_layout.setSpacing(4)
+
+        self.native_rotation_axes_checkbox = create_toggle_button(
+            "Maya LRA",
+            checked=False,
+            tooltip="Show or hide Maya native Local Rotation Axes on cached joints only.",
+            minimum_width=82
+        )
+
+        self.configuration_layout.addWidget(self.native_rotation_axes_checkbox)
 
         self.configuration_layout.addWidget(
             QtWidgets.QLabel("Primary Axis")
@@ -58,13 +70,8 @@ class JOWToolPanel(QtWidgets.QWidget):
         self.secondary_combo.setCurrentText("Y")
         self.disable_combo_keyboard_focus(self.secondary_combo)
 
-        self.configuration_layout.addWidget(
-            self.secondary_combo
-        )
-
-        self.configuration_layout.addWidget(
-            QtWidgets.QLabel("Secondary Mode")
-        )
+        self.configuration_layout.addWidget(self.secondary_combo)
+        self.configuration_layout.addWidget(QtWidgets.QLabel("Secondary Mode"))
 
         self.mode_combo = QtWidgets.QComboBox()
         self.mode_combo.addItems([
@@ -74,14 +81,8 @@ class JOWToolPanel(QtWidgets.QWidget):
             "Custom Object"
         ])
         self.disable_combo_keyboard_focus(self.mode_combo)
-
-        self.configuration_layout.addWidget(
-            self.mode_combo
-        )
-
-        main_layout.addLayout(
-            self.configuration_layout
-        )
+        self.configuration_layout.addWidget(self.mode_combo)
+        main_layout.addLayout(self.configuration_layout)
 
         self.guide_layout = QtWidgets.QHBoxLayout()
         self.guide_layout.setContentsMargins(0, 0, 0, 0)
@@ -107,54 +108,23 @@ class JOWToolPanel(QtWidgets.QWidget):
             minimum_width=130
         )
 
-        self.guide_layout.addWidget(
-            self.create_guide_btn
-        )
+        self.guide_layout.addWidget(self.create_guide_btn)
+        self.guide_layout.addWidget(self.select_guide_btn)
+        self.guide_layout.addWidget(self.delete_guide_btn)
+        self.guide_layout.addWidget(self.pick_custom_object_btn)
 
-        self.guide_layout.addWidget(
-            self.select_guide_btn
-        )
-
-        self.guide_layout.addWidget(
-            self.delete_guide_btn
-        )
-
-        self.guide_layout.addWidget(
-            self.pick_custom_object_btn
-        )
-
-        main_layout.addLayout(
-            self.guide_layout
-        )
+        main_layout.addLayout(self.guide_layout)
 
     def connect_signals(self):
-        self.primary_combo.currentTextChanged.connect(
-            self.on_primary_axis_changed
-        )
+        self.native_rotation_axes_checkbox.toggled.connect(self.native_rotation_axes_toggled.emit)
+        self.primary_combo.currentTextChanged.connect(self.on_primary_axis_changed)
+        self.secondary_combo.currentTextChanged.connect(self.on_secondary_axis_changed)
+        self.mode_combo.currentTextChanged.connect(self.emit_settings_changed)
 
-        self.secondary_combo.currentTextChanged.connect(
-            self.on_secondary_axis_changed
-        )
-
-        self.mode_combo.currentTextChanged.connect(
-            self.emit_settings_changed
-        )
-
-        self.create_guide_btn.clicked.connect(
-            self.create_guide_requested.emit
-        )
-
-        self.select_guide_btn.clicked.connect(
-            self.select_guide_requested.emit
-        )
-
-        self.delete_guide_btn.clicked.connect(
-            self.delete_guide_requested.emit
-        )
-
-        self.pick_custom_object_btn.clicked.connect(
-            self.pick_custom_object_requested.emit
-        )
+        self.create_guide_btn.clicked.connect(self.create_guide_requested.emit)
+        self.select_guide_btn.clicked.connect(self.select_guide_requested.emit)
+        self.delete_guide_btn.clicked.connect(self.delete_guide_requested.emit)
+        self.pick_custom_object_btn.clicked.connect(self.pick_custom_object_requested.emit)
 
     def disable_combo_keyboard_focus(self, combo):
         combo.setFocusPolicy(
@@ -163,12 +133,12 @@ class JOWToolPanel(QtWidgets.QWidget):
 
     def primary_axis(self):
         return self.primary_combo.currentText()
-
     def secondary_axis(self):
         return self.secondary_combo.currentText()
-
     def secondary_mode(self):
         return self.mode_combo.currentText()
+    def native_rotation_axes_enabled(self):
+        return self.native_rotation_axes_checkbox.isChecked()
 
     def emit_settings_changed(self, *args):
         self.settings_changed.emit()

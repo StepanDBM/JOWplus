@@ -141,3 +141,30 @@ def snapshots_are_different(
         ):
             return True
     return False
+
+def store_world_matrices(nodes):
+    data = {}
+
+    for node in nodes or []:
+        if not JOW_maya_nodes.exists(node):
+            continue
+
+        matrix = get_world_matrix(node)
+
+        if matrix is None:
+            continue
+
+        data[node] = matrix
+
+    return data
+
+
+def restore_world_matrices(matrix_data):
+    for node, matrix in matrix_data.items():
+        if not JOW_maya_nodes.exists(node):
+            continue
+
+        set_world_matrix(
+            node,
+            matrix
+        )
