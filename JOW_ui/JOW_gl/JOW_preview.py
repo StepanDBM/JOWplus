@@ -657,10 +657,9 @@ def build_preview_chain_from_joints(joints, settings):
 
     preview_chain.curve_plane_center = get_chain_center(joints)
 
-    preview_chain.curve_plane_normal = JOW_math.compute_curve_plane_normal(
+    preview_chain.curve_plane_normal = JOW_math.get_stabilized_curve_plane_normal(
         joints,
-        average_normals=settings.average_normals,
-        flip_plane=settings.flip_plane
+        settings
     )
 
     preview_chain.previous_normals = build_previous_normals(

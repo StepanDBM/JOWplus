@@ -1,3 +1,6 @@
+from itertools import chain
+
+
 try:
     from PySide2 import QtCore
     from PySide2 import QtGui
@@ -100,7 +103,7 @@ class JOWPlaneDrawer:
             return None
 
         normal = normal.normal()
-        basis_a, basis_b = self.get_plane_basis(normal)
+        basis_a, basis_b = self.get_chain_plane_basis(chain, normal)
 
         if basis_a is None or basis_b is None:
             return None
@@ -159,6 +162,56 @@ class JOWPlaneDrawer:
 
         return basis_a, basis_b
 
+    def get_chain_plane_basis(self, chain, normal):
+        chain_forward = self.get_chain_forward_axis(
+            chain,
+            normal
+        )
+
+        if chain_forward is not None:
+            basis_a = chain_forward
+            basis_b = normal ^ basis_a
+
+            if basis_b.length() >= 0.0001:
+                basis_b = basis_b.normal()
+
+                return basis_a, basis_b
+
+        return self.get_plane_basis(
+            normal
+        )
+
+
+    def get_chain_forward_axis(self, chain, normal):
+        if not chain:
+            return None
+
+        if len(chain.joints) < 2:
+            return None
+
+        first_joint = chain.joints[0]
+        last_joint = chain.joints[-1]
+
+        if first_joint.position is None:
+            return None
+
+        if last_joint.position is None:
+            return None
+
+        forward = last_joint.position - first_joint.position
+
+        if forward.length() < 0.0001:
+            return None
+
+        forward = forward.normal()
+
+        forward = forward - (normal * forward) * normal
+
+        if forward.length() < 0.0001:
+            return None
+
+        return forward.normal()
+
     def get_chain_plane_size(
         self,
         chain,
@@ -166,6 +219,22 @@ class JOWPlaneDrawer:
         basis_a,
         basis_b
     ):
+        if len(chain.joints) < 2:
+            return 1.0, 1.0
+        if chain.joints[0].position is None:
+            return 1.0, 1.0
+        if chain.joints[-1].position is None:
+            return 1.0, 1.0
+        chain_length = (
+            chain.joints[-1].position -
+            chain.joints[0].position
+        ).length()
+
+        if len(chain.joints) == 2:
+            half_width = max(chain_length * 0.55, 0.5)
+            half_height = max(chain_length * 0.12, 0.35)
+            return half_width, half_height
+
         values_a = []
         values_b = []
 
@@ -174,9 +243,7 @@ class JOWPlaneDrawer:
                 continue
 
             offset = joint.position - center
-
             values_a.append(offset * basis_a)
-
             values_b.append(offset * basis_b)
 
         if not values_a or not values_b:
@@ -193,8 +260,17 @@ class JOWPlaneDrawer:
 
         padding = 1.25
 
-        half_width = max(width * 0.5 * padding, 0.5)
-        half_height = max(height * 0.5 * padding, 0.5)
+        half_width = max(
+            width * 0.5 * padding,
+            chain_length * 0.35,
+            0.5
+        )
+
+        half_height = max(
+            height * 0.5 * padding,
+            chain_length * 0.08,
+            0.5
+        )
 
         return half_width, half_height
 

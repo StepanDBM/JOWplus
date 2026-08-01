@@ -187,7 +187,6 @@ def get_secondary_reference(
 
     return om.MVector(0, 1, 0)
 
-
 def get_previous_mode_up(joints, index, fallback_normal):
 
     if index > 0 and index < len(joints) - 1:
@@ -205,3 +204,341 @@ def get_previous_mode_up(joints, index, fallback_normal):
             return n.normal()
 
     return fallback_normal
+
+def get_current_axis_from_matrix(matrix, axis):
+    if not matrix:
+        return None
+
+    if axis == "X":
+        return safe_normalize(
+            vec_from_pos([
+                matrix[0],
+                matrix[1],
+                matrix[2]
+            ])
+        )
+
+    if axis == "Y":
+        return safe_normalize(
+            vec_from_pos([
+                matrix[4],
+                matrix[5],
+                matrix[6]
+            ])
+        )
+
+    if axis == "Z":
+        return safe_normalize(
+            vec_from_pos([
+                matrix[8],
+                matrix[9],
+                matrix[10]
+            ])
+        )
+
+    return None
+
+
+def get_chain_current_axis_hint(joints, axis):
+    result = om.MVector(0, 0, 0)
+    reference = None
+
+    for joint in joints or []:
+        matrix = JOW_maya_transforms.get_world_matrix(
+            joint
+        )
+
+        axis_vector = get_current_axis_from_matrix(
+            matrix,
+            axis
+        )
+
+        if axis_vector is None:
+            continue
+
+        if axis_vector.length() < 0.0001:
+            continue
+
+        axis_vector = axis_vector.normal()
+
+        if reference is None:
+            reference = axis_vector
+
+        if axis_vector * reference < 0:
+            axis_vector *= -1
+
+        result += axis_vector
+
+    if result.length() < 0.0001:
+        return None
+
+    return result.normal()
+
+
+def compute_strongest_curve_plane_normal(joints, flip_plane=False):
+    best_normal = None
+    best_strength = 0.0
+
+    for i in range(1, len(joints) - 1):
+        prev_pos = JOW_maya_transforms.get_world_position(
+            joints[i - 1]
+        )
+
+        curr_pos = JOW_maya_transforms.get_world_position(
+            joints[i]
+        )
+
+        next_pos = JOW_maya_transforms.get_world_position(
+            joints[i + 1]
+        )
+
+        if prev_pos is None or curr_pos is None or next_pos is None:
+            continue
+
+        a = curr_pos - prev_pos
+        b = next_pos - curr_pos
+
+        len_a = a.length()
+        len_b = b.length()
+
+        if len_a < 0.0001 or len_b < 0.0001:
+            continue
+
+        n = a ^ b
+        cross_len = n.length()
+
+        if cross_len < 0.0001:
+            continue
+
+        strength = cross_len / (len_a * len_b)
+
+        if strength <= best_strength:
+            continue
+
+        best_strength = strength
+        best_normal = n.normal()
+
+    if best_normal is None:
+        return None
+
+    if flip_plane:
+        best_normal *= -1
+
+    return best_normal
+
+
+def get_stabilized_curve_plane_normal(joints, settings):
+    one_bone_normal = compute_one_bone_semantic_plane_normal(
+        joints,
+        flip_plane=settings.flip_plane
+    )
+
+    if one_bone_normal is not None:
+        return one_bone_normal
+
+    strongest_normal = compute_strongest_curve_plane_normal(
+        joints,
+        flip_plane=settings.flip_plane
+    )
+
+    if strongest_normal is not None:
+        return strongest_normal
+
+    axis_hint = get_chain_current_axis_hint(
+        joints,
+        settings.secondary_axis
+    )
+
+    if axis_hint is not None:
+        if settings.flip_plane:
+            axis_hint *= -1
+
+        return axis_hint
+
+    return compute_curve_plane_normal(
+        joints,
+        average_normals=settings.average_normals,
+        flip_plane=settings.flip_plane
+    )
+
+
+def get_joint_children(joint):
+    if not joint:
+        return []
+
+    if not cmds.objExists(joint):
+        return []
+
+    children = cmds.listRelatives(
+        joint,
+        children=True,
+        type="joint",
+        fullPath=True
+    ) or []
+
+    return children
+
+
+def get_joint_world_position(joint):
+    if not joint:
+        return None
+
+    if not cmds.objExists(joint):
+        return None
+
+    return JOW_maya_transforms.get_world_position(
+        joint
+    )
+
+
+def get_distance_between_points(point_a, point_b):
+    if point_a is None:
+        return None
+
+    if point_b is None:
+        return None
+
+    return (point_a - point_b).length()
+
+
+def get_nearby_downstream_joint_for_tip(
+    tip_joint,
+    chain_joints,
+    max_distance=8.0
+):
+    tip_position = get_joint_world_position(
+        tip_joint
+    )
+
+    if tip_position is None:
+        return None
+
+    chain_lookup = set(
+        chain_joints or []
+    )
+
+    all_joints = cmds.ls(
+        type="joint",
+        long=True
+    ) or []
+
+    best_joint = None
+    best_child = None
+    best_distance = None
+
+    for candidate in all_joints:
+        if candidate in chain_lookup:
+            continue
+
+        candidate_position = get_joint_world_position(
+            candidate
+        )
+
+        if candidate_position is None:
+            continue
+
+        distance = get_distance_between_points(
+            tip_position,
+            candidate_position
+        )
+
+        if distance is None:
+            continue
+
+        if distance > max_distance:
+            continue
+
+        children = get_joint_children(
+            candidate
+        )
+
+        if not children:
+            continue
+
+        child = children[0]
+
+        if child in chain_lookup:
+            continue
+
+        child_position = get_joint_world_position(
+            child
+        )
+
+        if child_position is None:
+            continue
+
+        if best_distance is None or distance < best_distance:
+            best_distance = distance
+            best_joint = candidate
+            best_child = child
+
+    if best_joint is None:
+        return None
+
+    return best_joint, best_child
+
+
+def compute_one_bone_semantic_plane_normal(
+    joints,
+    flip_plane=False
+):
+    if not joints:
+        return None
+
+    if len(joints) != 2:
+        return None
+
+    root_joint = joints[0]
+    tip_joint = joints[1]
+
+    root_position = get_joint_world_position(
+        root_joint
+    )
+
+    tip_position = get_joint_world_position(
+        tip_joint
+    )
+
+    if root_position is None:
+        return None
+
+    if tip_position is None:
+        return None
+
+    downstream = get_nearby_downstream_joint_for_tip(
+        tip_joint,
+        joints
+    )
+
+    if not downstream:
+        return None
+
+    downstream_joint, downstream_child = downstream
+
+    downstream_child_position = get_joint_world_position(
+        downstream_child
+    )
+
+    if downstream_child_position is None:
+        return None
+
+    a = tip_position - root_position
+    b = downstream_child_position - tip_position
+
+    if a.length() < 0.0001:
+        return None
+
+    if b.length() < 0.0001:
+        return None
+
+    normal = a ^ b
+
+    if normal.length() < 0.0001:
+        return None
+
+    normal = normal.normal()
+
+    if flip_plane:
+        normal *= -1
+
+    return normal

@@ -395,11 +395,34 @@ class JOWWindow(QtWidgets.QDialog):
         self.sync_viewport_selection_from_maya()
         self.update_set_cache_button_state()
 
+    def cleanup_before_delete(self):
+        try:
+            self.stop_live_sync_timer()
+        except Exception:
+            pass
+
+        try:
+            self.delete_selection_script_job()
+        except Exception:
+            pass
+
+        try:
+            self.set_cached_native_rotation_axes_visibility(False)
+        except Exception:
+            pass
+
     def closeEvent(self, event):
-        self.save_ui_state()
-        self.stop_live_sync_timer()
-        self.delete_selection_script_job()
-        QtWidgets.QDialog.closeEvent(self, event)
+        try:
+            self.save_ui_state()
+        except Exception:
+            pass
+
+        self.cleanup_before_delete()
+
+        QtWidgets.QDialog.closeEvent(
+            self,
+            event
+        )
 
     ##########################################################
     # Cache

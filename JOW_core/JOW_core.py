@@ -143,10 +143,9 @@ def compute_linear_chain_orientation(joints, settings):
 
         return result
 
-    curve_plane_normal = JOW_math.compute_curve_plane_normal(
+    curve_plane_normal = JOW_math.get_stabilized_curve_plane_normal(
         joints,
-        average_normals=settings.average_normals,
-        flip_plane=settings.flip_plane
+        settings
     )
 
     for i, jnt in enumerate(joints):
