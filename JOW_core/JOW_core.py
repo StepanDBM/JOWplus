@@ -76,6 +76,30 @@ def get_position_lock_nodes_for_root(root):
         if JOW_maya_nodes.exists(node)
     ]
 
+def joint_has_child_in_chain(joint, chain_lookup):
+    children = JOW_maya_joints.get_child_joints(
+        joint
+    )
+
+    for child in children:
+        if child in chain_lookup:
+            return True
+
+    return False
+
+
+def is_chain_end_joint(joint, chain_lookup):
+    if not joint:
+        return False
+
+    if not chain_lookup:
+        return False
+
+    return not joint_has_child_in_chain(
+        joint,
+        chain_lookup
+    )
+
 def get_forward_for_joint(joints, index, jnt):
     jnt_pos = JOW_maya_transforms.get_world_position(jnt)
     if jnt_pos is None:
@@ -133,6 +157,8 @@ def compute_linear_chain_orientation(joints, settings):
         if JOW_maya_nodes.exists(joint)
     ]
 
+    chain_lookup = set(joints)
+
     if len(joints) < 2:
         if joints:
             cmds.warning(
@@ -149,8 +175,7 @@ def compute_linear_chain_orientation(joints, settings):
     )
 
     for i, jnt in enumerate(joints):
-        is_end_joint = (i == len(joints) - 1)
-
+        is_end_joint = is_chain_end_joint(jnt, chain_lookup)
         if is_end_joint and not settings.orient_end_joint:
             continue
 
